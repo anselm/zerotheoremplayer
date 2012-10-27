@@ -1,0 +1,9 @@
+convert image.jpg -resize 57x57\! Icon.png
+convert image.jpg -resize 114x114\! Icon@2x.png
+convert image.jpg -resize 72x72\! Icon-72.png
+convert image.jpg -resize 144x144\! Icon-72@2x.png
+convert image.jpg -resize 29x29\! Icon-Small.png
+convert image.jpg -resize 58x58\! Icon-Small@2x.png
+convert image.jpg -resize 50x50\! Icon-Small-50.png
+convert image.jpg -resize 100x100\! Icon-Small-50@2x.png
+ 
