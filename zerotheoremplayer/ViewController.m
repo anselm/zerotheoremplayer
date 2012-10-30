@@ -3,6 +3,15 @@
 #import <MediaPlayer/MediaPlayer.h>
 #import <AVFoundation/AVFoundation.h>
 #import "ViewController.h"
+#import "ServerBrowser.h"
+#import "Connection.h"
+
+extern bool useavplayer;
+extern bool useexternal;
+extern int fillmode;
+extern int loopmode;
+NSString* defaultFile = 0;
+int nloops = 0;
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 // av player utils
@@ -25,9 +34,6 @@
 @end
 
 @implementation ViewController
-
-NSString* serverurl = 0;
-NSURL* playme = 0;
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 // find a file
@@ -71,9 +77,11 @@ NSURL* playme = 0;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
-// network scanner
+// http network scanner
 /////////////////////////////////////////////////////////////////////////////////////////////
 
+NSString* serverurl = 0;
+NSURL* playme = 0;
 NSURLRequest* request;
 NSURLConnection* connection;
 NSMutableData* responseData = nil;
@@ -109,6 +117,9 @@ int poll_count = 0;
                     playme = [NSURL URLWithString:val];
                 } else {
                     playme = [self findFile:val];
+                    if(!playme) {
+                        playme = [self findFile:0];
+                    }
                 }
                 if(playme) {
                     NSLog(@"network requestiong to play %@",playme);
@@ -129,10 +140,10 @@ int poll_count = 0;
 
 - (void)pollNetwork:(id)sender {
     NSString* blah = [NSString stringWithFormat:@"%@?poll=%d",serverurl,poll_count];
-    NSURL* url = [NSURL URLWithString:blah];
+    //NSURL* url = [NSURL URLWithString:blah];
     request = [NSURLRequest requestWithURL: [NSURL URLWithString:blah]];
     connection = [[NSURLConnection alloc] initWithRequest:request delegate:self];
-    NSLog(@"polling again %d %@",poll_count,url); poll_count++;
+    //NSLog(@"polling again %d %@",poll_count,url); poll_count++;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -140,7 +151,7 @@ int poll_count = 0;
 /////////////////////////////////////////////////////////////////////////////////////////////
 
 MPMoviePlayerController *moviePlayer;
-UIScreen* external_disp;
+UIScreen* external_screen;
 UIWindow* external_window;
 AVPlayer *player;
 AVPlayerItem *playerItem;
@@ -148,10 +159,26 @@ AVPlayerLayer *playerLayer;
 CMTime duration;
 
 - (void)moviePlaybackComplete:(NSNotification *)notification {
-    //MPMoviePlayerController *moviePlayer = [notification object];
-    //[[NSNotificationCenter defaultCenter] removeObserver:self name:MPMoviePlayerControllerPlaybackDidFinishNotification object:moviePlayer];
-    [moviePlayer.view removeFromSuperview];
-    [moviePlayer release];
+    nloops++;
+    if(moviePlayer) {
+        //MPMoviePlayerController *moviePlayer = [notification object];
+        //[[NSNotificationCenter defaultCenter] removeObserver:self name:MPMoviePlayerControllerPlaybackDidFinishNotification object:moviePlayer];
+        //[moviePlayer.view removeFromSuperview];
+        //[moviePlayer release];
+        int reason = [[[notification userInfo] objectForKey:MPMoviePlayerPlaybackDidFinishReasonUserInfoKey] intValue];
+        if(reason == MPMovieFinishReasonPlaybackEnded) {
+            NSLog(@"Reason: MPMovieFinishReasonPlaybackEnded");
+        }
+        else if(reason == MPMovieFinishReasonPlaybackError) {
+            NSLog(@"Reason: MPMovieFinishReasonPlaybackError");
+        }
+        else if(reason == MPMovieFinishReasonUserExited) {
+            NSLog(@"Reason: MPMovieFinishReasonUserExited");
+        }
+        else {
+            NSLog(@"Reason: %d", reason);
+        }
+    }
 }
 
 -(void)playMovie:(NSURL*) filepathurl {
@@ -184,17 +211,31 @@ CMTime duration;
     // better
     /////////////////////////////////////////////////////////////////////////////////////////////
 
-    if (!external_window && [[UIScreen screens] count] > 1) {
+    if (useexternal && !external_window && [[UIScreen screens] count] > 1) {
         UIScreenMode* best = 0;
-        external_disp = [[UIScreen screens] objectAtIndex:1];
-        for(UIScreenMode* obj in [external_disp availableModes]) {
-            NSLog(@"display size %f,%f",obj.size.width,obj.size.height);
+        external_screen = [[UIScreen screens] objectAtIndex:1];
+        for(UIScreenMode* obj in [external_screen availableModes]) {
+            //NSLog(@"display size %f,%f",obj.size.width,obj.size.height);
             if(!best || obj.size.width > best.size.width) best = obj;
         }
-        [external_disp setCurrentMode:best];
+        [external_screen setCurrentMode:best];
         external_window = [[UIWindow alloc] init];
-        external_window.screen = external_disp;
-        [external_window makeKeyAndVisible];
+        external_window.screen = external_screen;
+//        [external_window makeKeyAndVisible];
+        external_window.hidden = NO;
+
+        switch(fillmode) {
+            case 0:
+                [external_screen setOverscanCompensation:UIScreenOverscanCompensationInsetApplicationFrame];
+                break;
+            case 1:
+                [external_screen setOverscanCompensation:UIScreenOverscanCompensationInsetBounds];
+                break;
+            case 2:
+                [external_screen setOverscanCompensation:UIScreenOverscanCompensationScale]; break;
+            case 3:
+                break;
+        }
     }
 
     /////////////////////////////////////////////////////////////////////////////////////////////
@@ -202,7 +243,7 @@ CMTime duration;
     // http://stackoverflow.com/questions/4560065/MPMoviePlayerController-switching-movies-causes-white-flash
     /////////////////////////////////////////////////////////////////////////////////////////////
 
-    if(0) {
+    if(!useavplayer) {
         MPMoviePlayerController* old = moviePlayer;
         
         if(old) {
@@ -228,19 +269,30 @@ CMTime duration;
             [self.view addSubview:moviePlayer.view];
         }
 
-        /////////////////////////////////////////////////////////////////////////////////////////////
-        // play movie now
-        /////////////////////////////////////////////////////////////////////////////////////////////
+        [[NSNotificationCenter defaultCenter] removeObserver:self
+                                                        name:MPMoviePlayerPlaybackDidFinishNotification
+                                                      object:moviePlayer];
+        [[NSNotificationCenter defaultCenter] removeObserver:self
+                                                        name:MPMoviePlayerDidExitFullscreenNotification
+                                                      object:moviePlayer];
+        
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(moviePlaybackComplete:)
+                                                     name:MPMoviePlayerPlaybackDidFinishNotification
+                                                   object:nil];
+        
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(moviePlaybackComplete:)
+                                                     name:MPMoviePlayerDidExitFullscreenNotification
+                                                   object:nil];
         
         [moviePlayer setControlStyle:MPMovieControlStyleNone];
-        //moviePlayer.controlStyle = MPMovieControlStyleNone;
-        //[moviePlayer setFullscreen:YES];
         moviePlayer.fullscreen = YES;
         moviePlayer.scalingMode = MPMovieScalingModeFill;
-        moviePlayer.repeatMode = 1;
+        moviePlayer.repeatMode = loopmode ? 1 : 0;
         [moviePlayer play];
         NSLog(@"playing a new movie %@",filepathurl);
-        
+
     } else {
 
         if(!player) {
@@ -253,19 +305,28 @@ CMTime duration;
             if(external_window) {
                 bounds = [external_window bounds];
             }
-            UIView *newView = [[UIView alloc] initWithFrame:bounds];
-            newView.backgroundColor = [UIColor blackColor];
             
             AVPlayerLayer *avPlayerLayer = [[AVPlayerLayer playerLayerWithPlayer:player] retain];
             [avPlayerLayer setFrame:bounds];
-            playerLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
-            NSLog(@"bounds are %f,%f",bounds.size.width,bounds.size.height);
+        //    playerLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
+            NSLog(@"avplayer bounds are %f,%f",bounds.size.width,bounds.size.height);
+
+            UIView *newView = [[UIView alloc] initWithFrame:bounds];
+            newView.backgroundColor = [UIColor blackColor];
+            //[newView setContentStretch:CGRect(0,0,100,100)];
             [newView.layer addSublayer:avPlayerLayer];
-            if(!external_window) {
-                [self.view addSubview:newView];
-            } else {
+            if(external_window) {
                 [external_window addSubview:newView];
+                // make a touchable area
+                UIView *newView2 = [[UIView alloc] initWithFrame:bounds];
+                newView2.backgroundColor = [UIColor yellowColor];
+                //[newView setContentStretch:CGRect(0,0,100,100)];
+                [self.view addSubview:newView2];
+            } else {
+                [self.view addSubview:newView];
             }
+
+
         } else {
             [player pause];
             AVAsset *asset = [AVURLAsset URLAssetWithURL:filepathurl options:nil];
@@ -273,16 +334,21 @@ CMTime duration;
             [player replaceCurrentItemWithPlayerItem:playerItem];
         }
 
+        //playerLayer.needsDisplayOnBoundsChange = YES;
+        //playbackView.layer.needsDisplayOnBoundsChange = YES;
+
         [player play];
+
         [[NSNotificationCenter defaultCenter] addObserver:self
                                                  selector:@selector(playerItemDidReachEnd:)
                                                      name:AVPlayerItemDidPlayToEndTimeNotification
                                                    object:[player currentItem]];
+    
+
+        player.actionAtItemEnd = AVPlayerActionAtItemEndNone;
 
         
-
-//        player.actionAtItemEnd = AVPlayerActionAtItemEndNone;
-
+        NSLog(@"playing a new movie %@",filepathurl);
 
         //[player pause];
         //[player replaceCurrentItemWithPlayerItem:newPlayerItem];
@@ -294,13 +360,47 @@ CMTime duration;
 }
 
 - (void)playerItemDidReachEnd:(NSNotification *)notification {
-    AVPlayerItem *p = [notification object];
-    [p seekToTime:kCMTimeZero];
+    nloops++;
+    if(loopmode) {
+        AVPlayerItem *p = [notification object];
+        [p seekToTime:kCMTimeZero];
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 // startup
 /////////////////////////////////////////////////////////////////////////////////////////////
+
+- (void) pause {
+    if(moviePlayer) {
+        if(moviePlayer.playbackState == MPMoviePlaybackStatePlaying) {
+            [moviePlayer pause];
+            NSLog(@"pausing movie");
+        } else {
+            if(!loopmode && nloops) {
+                nloops = 0;
+                [moviePlayer setCurrentPlaybackTime:0];
+            }
+            [moviePlayer play];
+            NSLog(@"playing movie");
+        }
+    }
+    
+    if(player) {
+        if(player.rate != 0) {
+            [player pause];
+            NSLog(@"pausing movie");
+        } else {
+            if(!loopmode && nloops) {
+                nloops = 0;
+                [player seekToTime:kCMTimeZero]; // if done then reset
+            }
+            [player play];
+            NSLog(@"playing movie");
+        }
+    }
+    
+}
 
 - (void) playNotification:(NSNotification *) notification {
     if ([[notification name] isEqualToString:@"Play"]) {
@@ -308,6 +408,15 @@ CMTime duration;
             // play requested file
             [self playMovie:playme];
         }
+    }
+}
+
+ServerBrowser* networkServerBrowser = 0;
+
+- (void)networkTrafficReceived:(id)notification {
+    if ([[notification name] isEqualToString:@"NetworkTrafficReceived"]) {
+        NSLog(@"Network Traffic Received");
+        [self pause];
     }
 }
 
@@ -319,6 +428,12 @@ CMTime duration;
 }
 
 - (void) dealloc {
+    if(networkServerBrowser) {
+        [networkServerBrowser stop];
+        [networkServerBrowser release];
+    }
+    networkServerBrowser = 0;
+
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     [super dealloc];
 }
@@ -329,22 +444,31 @@ CMTime duration;
         // preferentially try to visit url to get commands to run
         [self pollNetwork:self];
     } else {
-        // if no file supplied by network try play first file
-        playme = [self findFile:0];
-        [[NSNotificationCenter defaultCenter] postNotificationName:@"Play" object:self];
+        if(defaultFile) {
+            // try play that
+            playme = [self findFile:defaultFile];
+            [[NSNotificationCenter defaultCenter] postNotificationName:@"Play" object:self];
+        } else {
+            // if no file supplied by network try play first file
+            playme = [self findFile:0];
+            [[NSNotificationCenter defaultCenter] postNotificationName:@"Play" object:self];
+        }
     }
+
+    [[NSNotificationCenter defaultCenter] removeObserver:self
+                                                    name:MPMoviePlayerPlaybackDidFinishNotification
+                                                  object:moviePlayer];
+
+    // start a small bonjour listener
+    //[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(networkServiceFound:) name:@"NetworkServiceFound" object:nil];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(networkTrafficReceived:) name:@"NetworkTrafficReceived" object:nil];
+    networkServerBrowser = [[ServerBrowser alloc] init];
+    [networkServerBrowser start];
+
 }
 
 - (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
-    if(moviePlayer) {
-        if(moviePlayer.playbackState == MPMoviePlaybackStatePlaying) {
-            [moviePlayer pause];
-            NSLog(@"pausing movie");
-        } else {
-            [moviePlayer play];
-            NSLog(@"playing movie");
-        }
-    }
+    [self pause];
 }
 
 - (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event {
@@ -355,3 +479,5 @@ CMTime duration;
 
 
 @end
+
+
