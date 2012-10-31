@@ -119,8 +119,8 @@
     connection = nil;
 }
 
-- (void) receivedNetworkPacket:(NSDictionary*)message viaConnection:(Connection*)_connection {
-    NSNotification* notification = [NSNotification notificationWithName:@"NetworkTrafficReceived" object:self];
+- (void) receivedNetworkPacket:(NSDictionary*)dict viaConnection:(Connection*)_connection {
+    NSNotification* notification = [NSNotification notificationWithName:@"NetworkTrafficReceived" object:self userInfo:dict];
     [[NSNotificationCenter defaultCenter] postNotification:notification];
 }
 

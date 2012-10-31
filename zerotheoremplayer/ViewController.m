@@ -158,9 +158,24 @@ AVPlayerItem *playerItem;
 AVPlayerLayer *playerLayer;
 CMTime duration;
 
+
+- (void)playerItemDidReachEnd:(NSNotification *)notification {
+    if(player) {
+        nloops++;
+        //    if(loopmode) {
+        AVPlayerItem *p = [notification object];
+        [p seekToTime:kCMTimeZero];
+        //   }
+    }
+}
+
 - (void)moviePlaybackComplete:(NSNotification *)notification {
     nloops++;
     if(moviePlayer) {
+        if(!loopmode) {
+            // because the end of some movies is not black
+            [moviePlayer setCurrentPlaybackTime:0];
+        }
         //MPMoviePlayerController *moviePlayer = [notification object];
         //[[NSNotificationCenter defaultCenter] removeObserver:self name:MPMoviePlayerControllerPlaybackDidFinishNotification object:moviePlayer];
         //[moviePlayer.view removeFromSuperview];
@@ -260,11 +275,12 @@ CMTime duration;
             [external_window addSubview:moviePlayer.view];
         } else {
             CGRect bounds = [[UIScreen mainScreen] bounds];
-            if(bounds.size.width < bounds.size.height) {
-                float temp = bounds.size.width;
-                bounds.size.width = bounds.size.height;
-                bounds.size.height = temp;
-            }
+            //if(bounds.size.width < bounds.size.height) {
+            //    float temp = bounds.size.width;
+            //    bounds.size.width = bounds.size.height;
+            //    bounds.size.height = temp;
+            //}
+            //view.transform = CGAffineTransformMakeRotation(M_PI_2);
             [moviePlayer.view setFrame:bounds];
             [self.view addSubview:moviePlayer.view];
         }
@@ -359,44 +375,75 @@ CMTime duration;
 
 }
 
-- (void)playerItemDidReachEnd:(NSNotification *)notification {
-    nloops++;
-    if(loopmode) {
-        AVPlayerItem *p = [notification object];
-        [p seekToTime:kCMTimeZero];
-    }
-}
-
 /////////////////////////////////////////////////////////////////////////////////////////////
 // startup
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-- (void) pause {
+- (void) resetTo:(float)time {
+    if(moviePlayer) {
+        [moviePlayer pause];
+        [moviePlayer setCurrentPlaybackTime:time];
+        nloops = 0;
+    }
+
+    if(player) {
+        [player pause];
+        Float64 seconds = time;
+        int32_t preferredTimeScale = 25;
+        CMTime inTime = CMTimeMakeWithSeconds(seconds, preferredTimeScale);
+        [player seekToTime:inTime];
+        nloops = 0;
+    }
+}
+
+- (void) playmode:(int)state { // -1 = toggle, 0 = stop, 1 = play
     if(moviePlayer) {
         if(moviePlayer.playbackState == MPMoviePlaybackStatePlaying) {
-            [moviePlayer pause];
-            NSLog(@"pausing movie");
+            if(state == -1 || state == 0) {
+                [moviePlayer pause];
+                NSLog(@"Asked to toggle or pause a running movie - pausing movie");
+            } else if(state == 1) {
+                NSLog(@"Asked to play but already playing");
+            }
         } else {
+            // we are paused - circumvent loop end case
             if(!loopmode && nloops) {
                 nloops = 0;
                 [moviePlayer setCurrentPlaybackTime:0];
             }
-            [moviePlayer play];
-            NSLog(@"playing movie");
+            // if we want to play or toggle do so
+            if(state == -1 || state == 1) {
+                [moviePlayer pause];
+                NSLog(@"Asked to toggle or play a paused movie - playing movie");
+                [moviePlayer play];
+            } else if(state == 0) {
+                NSLog(@"Asked to stop but already stopped");
+            }
         }
     }
-    
+
+    // variation of above - xxx could use a polymorphic base
     if(player) {
         if(player.rate != 0) {
-            [player pause];
-            NSLog(@"pausing movie");
+            if(state == -1 || state == 0) {
+                [player pause];
+                NSLog(@"Asked to toggle or pause a running movie - pausing movie");
+            } else if(state == 1) {
+                NSLog(@"Asked to play but already playing");
+            }
         } else {
             if(!loopmode && nloops) {
                 nloops = 0;
                 [player seekToTime:kCMTimeZero]; // if done then reset
             }
-            [player play];
-            NSLog(@"playing movie");
+            // if we want to play or toggle do so
+            if(state == -1 || state == 1) {
+                [player pause];
+                NSLog(@"Asked to toggle or play a paused movie - playing movie");
+                [player play];
+            } else if(state == 0) {
+                NSLog(@"Asked to stop but already stopped");
+            }
         }
     }
     
@@ -415,8 +462,51 @@ ServerBrowser* networkServerBrowser = 0;
 
 - (void)networkTrafficReceived:(id)notification {
     if ([[notification name] isEqualToString:@"NetworkTrafficReceived"]) {
-        NSLog(@"Network Traffic Received");
-        [self pause];
+        NSLog(@"Network traffique");
+        NSDictionary* dict = [notification userInfo];
+        if(dict) {
+            NSString* message = [dict objectForKey:@"message"];
+            NSString* value = [dict objectForKey:@"value"];
+            float val = 0;
+            if(value && [value length] > 0) {
+                val = [value floatValue];
+            } else {
+                value = 0;
+            }
+            if(message) {
+                NSLog(@"Network Traffic Received %@",message);
+                if([message isEqualToString:@"toggle"]) {
+                    [self playmode:-1];
+                }
+                else if([message isEqualToString:@"pause"]) {
+                    if(value) [self resetTo:val];
+                    [self playmode:0];
+                }
+                else if([message isEqualToString:@"stop"]) {
+                    if(value) [self resetTo:val];
+                    [self playmode:0];
+                }
+                else if([message isEqualToString:@"play"]) {
+                    if(value) [self resetTo:val];
+                    [self playmode:1];
+                }
+                else if([message isEqualToString:@"reset"]) {
+                    [self resetTo:val];
+                }
+                else if([message isEqualToString:@"goto"]) {
+                    [self resetTo:val];
+                }
+                else if([message isEqualToString:@"launch"]) {
+                    NSString* file = [dict objectForKey:@"value"];
+                    if(file) {
+                        playme = [self findFile:file];
+                        if(file) {
+                            [[NSNotificationCenter defaultCenter] postNotificationName:@"Play" object:self];
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -447,11 +537,15 @@ ServerBrowser* networkServerBrowser = 0;
         if(defaultFile) {
             // try play that
             playme = [self findFile:defaultFile];
-            [[NSNotificationCenter defaultCenter] postNotificationName:@"Play" object:self];
+            if(playme) {
+                [[NSNotificationCenter defaultCenter] postNotificationName:@"Play" object:self];
+            }
         } else {
             // if no file supplied by network try play first file
             playme = [self findFile:0];
-            [[NSNotificationCenter defaultCenter] postNotificationName:@"Play" object:self];
+            if(playme) {
+                [[NSNotificationCenter defaultCenter] postNotificationName:@"Play" object:self];
+            }
         }
     }
 
@@ -468,7 +562,7 @@ ServerBrowser* networkServerBrowser = 0;
 }
 
 - (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
-    [self pause];
+    [self playmode:-1]; // toggle
 }
 
 - (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event {

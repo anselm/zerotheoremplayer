@@ -83,6 +83,7 @@ NSString* text = @"http://hook.org/l/files.json";
 }
 
 - (BOOL)shouldAutorotateToInterfaceOrientation:(UIInterfaceOrientation)interfaceOrientation {
+    if(!useexternal) return true;
     return (interfaceOrientation == UIInterfaceOrientationLandscapeLeft);
 }
 
@@ -241,6 +242,7 @@ FilePicker* filepicker;
 }
 
 - (BOOL)shouldAutorotateToInterfaceOrientation:(UIInterfaceOrientation)interfaceOrientation {
+    if(!useexternal) return true;
     return (interfaceOrientation == UIInterfaceOrientationLandscapeLeft);
 }
 
