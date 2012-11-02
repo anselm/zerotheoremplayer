@@ -157,7 +157,8 @@ AVPlayer *player;
 AVPlayerItem *playerItem;
 AVPlayerLayer *playerLayer;
 CMTime duration;
-
+UIView* externalview;
+UIView* localview;
 
 - (void)playerItemDidReachEnd:(NSNotification *)notification {
     if(player) {
@@ -223,7 +224,7 @@ CMTime duration;
 */
 
     /////////////////////////////////////////////////////////////////////////////////////////////
-    // better
+    // find and attach to external screen if desired and exists
     /////////////////////////////////////////////////////////////////////////////////////////////
 
     if (useexternal && !external_window && [[UIScreen screens] count] > 1) {
@@ -236,7 +237,7 @@ CMTime duration;
         [external_screen setCurrentMode:best];
         external_window = [[UIWindow alloc] init];
         external_window.screen = external_screen;
-//        [external_window makeKeyAndVisible];
+        // [external_window makeKeyAndVisible];
         external_window.hidden = NO;
 
         switch(fillmode) {
@@ -254,7 +255,7 @@ CMTime duration;
     }
 
     /////////////////////////////////////////////////////////////////////////////////////////////
-    // start or restart movie player
+    // start or restart movie player - using a movie player format
     // http://stackoverflow.com/questions/4560065/MPMoviePlayerController-switching-movies-causes-white-flash
     /////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -280,9 +281,12 @@ CMTime duration;
             //    bounds.size.width = bounds.size.height;
             //    bounds.size.height = temp;
             //}
-            //view.transform = CGAffineTransformMakeRotation(M_PI_2);
+           // self.view.transform = CGAffineTransformMakeRotation(M_PI_2);
+           // [self.view setTransform:CGAffineTransformMakeScale(1.0, 1.0)];
             [moviePlayer.view setFrame:bounds];
             [self.view addSubview:moviePlayer.view];
+            //[moviePlayer.view setTransform:CGAffineTransformMakeScale(1.0, 1.0)];
+            //[moviePlayer.view setTransform:CGAffineTransformMakeRotation(M_PI_2)];
         }
 
         [[NSNotificationCenter defaultCenter] removeObserver:self
@@ -290,7 +294,7 @@ CMTime duration;
                                                       object:moviePlayer];
         [[NSNotificationCenter defaultCenter] removeObserver:self
                                                         name:MPMoviePlayerDidExitFullscreenNotification
-                                                      object:moviePlayer];
+                                                      object:moviePlayer]; // xxx why is this object moviePlayer
         
         [[NSNotificationCenter defaultCenter] addObserver:self
                                                  selector:@selector(moviePlaybackComplete:)
@@ -311,45 +315,88 @@ CMTime duration;
 
     } else {
 
+        ///////////////////////////////////////////////////////////////////////////////////////////////
+        // attach player to window?
+        ///////////////////////////////////////////////////////////////////////////////////////////////
+        
         if(!player) {
+            
+            // get the assets
             AVAsset *asset = [AVURLAsset URLAssetWithURL:filepathurl options:nil];
             AVPlayerItem *playerItem = [AVPlayerItem playerItemWithAsset:asset];
             player = [[AVPlayer playerWithPlayerItem:playerItem] retain];
             duration = player.currentItem.asset.duration;
 
+            // get bounds of target
             CGRect bounds = [self.view bounds];
             if(external_window) {
                 bounds = [external_window bounds];
             }
-            
+
+            // make av player
             AVPlayerLayer *avPlayerLayer = [[AVPlayerLayer playerLayerWithPlayer:player] retain];
             [avPlayerLayer setFrame:bounds];
-        //    playerLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
+            playerLayer.videoGravity = AVLayerVideoGravityResizeAspectFill; // this is the key line to fill display edge to edge
             NSLog(@"avplayer bounds are %f,%f",bounds.size.width,bounds.size.height);
 
-            UIView *newView = [[UIView alloc] initWithFrame:bounds];
-            newView.backgroundColor = [UIColor blackColor];
-            //[newView setContentStretch:CGRect(0,0,100,100)];
-            [newView.layer addSublayer:avPlayerLayer];
+            // always make a local view
+            localview = [[UIView alloc] initWithFrame:bounds];
+            localview.backgroundColor = [UIColor yellowColor];
+            [self.view addSubview:localview];
+
+            // decide where to attach av player
             if(external_window) {
-                [external_window addSubview:newView];
-                // make a touchable area
-                UIView *newView2 = [[UIView alloc] initWithFrame:bounds];
-                newView2.backgroundColor = [UIColor yellowColor];
-                //[newView setContentStretch:CGRect(0,0,100,100)];
-                [self.view addSubview:newView2];
+                externalview = [[UIView alloc] initWithFrame:bounds];
+                externalview.backgroundColor = [UIColor blackColor];
+                [externalview.layer addSublayer:avPlayerLayer];
+                [external_window addSubview:externalview];
+
+                // does not fill scn?
+                [externalview setTransform:CGAffineTransformMakeScale(1.1, 1.1)];
+
             } else {
-                [self.view addSubview:newView];
+                localview.backgroundColor = [UIColor blackColor];
+                [localview.layer addSublayer:avPlayerLayer];
             }
 
+            ////////////////////////////////////////////////////////////////////// gesture recognizers
+            
+            UIPinchGestureRecognizer *pinchRecognizer = [[UIPinchGestureRecognizer alloc] initWithTarget:self action:@selector(scale:)];
+            [pinchRecognizer setDelegate:self];
+            [localview addGestureRecognizer:pinchRecognizer];
 
-        } else {
+            UIRotationGestureRecognizer *rotationRecognizer = [[UIRotationGestureRecognizer alloc] initWithTarget:self action:@selector(rotate:)];
+            [rotationRecognizer setDelegate:self];
+            [localview addGestureRecognizer:rotationRecognizer];
+
+            UIPanGestureRecognizer *panRecognizer = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(move:)];
+            [panRecognizer setMinimumNumberOfTouches:1];
+            [panRecognizer setMaximumNumberOfTouches:1];
+            [panRecognizer setDelegate:self];
+            [localview addGestureRecognizer:panRecognizer];
+
+            UITapGestureRecognizer *tapRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapped:)];
+            [tapRecognizer setNumberOfTapsRequired:1];
+            [tapRecognizer setDelegate:self];
+            [localview addGestureRecognizer:tapRecognizer];
+            
+        }
+        
+        ///////////////////////////////////////////////////////////////////////////////////////////////
+        // just load something new into the player
+        ///////////////////////////////////////////////////////////////////////////////////////////////
+        
+        else {
             [player pause];
             AVAsset *asset = [AVURLAsset URLAssetWithURL:filepathurl options:nil];
             AVPlayerItem *playerItem = [AVPlayerItem playerItemWithAsset:asset];
             [player replaceCurrentItemWithPlayerItem:playerItem];
         }
 
+        ///////////////////////////////////////////////////////////////////////////////////////////////
+        // play it
+        ///////////////////////////////////////////////////////////////////////////////////////////////
+        
         //playerLayer.needsDisplayOnBoundsChange = YES;
         //playbackView.layer.needsDisplayOnBoundsChange = YES;
 
@@ -373,6 +420,86 @@ CMTime duration;
 
     }
 
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// handle events
+
+float lastScale = 1.0;
+float lastRotation = 0.0;
+float firstX = 0.0, firstY = 0.0;
+
+-(void)scale:(id)sender {
+    // http://www.icodeblog.com/2010/10/14/working-with-uigesturerecognizers/
+
+    UIView* view = externalview ? externalview : localview;
+    if(!view)return;
+
+	if([(UIPinchGestureRecognizer*)sender state] == UIGestureRecognizerStateEnded) {
+		lastScale = 1.0;
+		return;
+	}
+
+	CGFloat scale = 1.0 - (lastScale - [(UIPinchGestureRecognizer*)sender scale]);
+    [view setTransform:CGAffineTransformScale(view.transform, scale, scale)];
+	lastScale = [(UIPinchGestureRecognizer*)sender scale];
+}
+
+-(void)rotate:(id)sender {
+
+    // disabled
+    if(1)return;
+    UIView* view = externalview ? externalview : localview;
+    if(!view)return;
+    
+	if([(UIRotationGestureRecognizer*)sender state] == UIGestureRecognizerStateEnded) {
+        lastRotation = 0.0;
+		return;
+	}
+    
+	CGFloat rotation = 0.0 - (lastRotation - [(UIRotationGestureRecognizer*)sender rotation]);
+	[view setTransform:CGAffineTransformRotate(view.transform,rotation)];
+	lastRotation = [(UIRotationGestureRecognizer*)sender rotation];
+}
+
+-(void)move:(id)sender {
+
+    UIView* view = externalview ? externalview : localview;
+    if(!view)return;
+
+	[[view layer] removeAllAnimations];
+
+	CGPoint translatedPoint = [(UIPanGestureRecognizer*)sender translationInView:view];
+    
+	if([(UIPanGestureRecognizer*)sender state] == UIGestureRecognizerStateBegan) {
+		firstX = [view center].x;
+		firstY = [view center].y;
+	}
+
+	translatedPoint = CGPointMake(firstX+translatedPoint.y, firstY-translatedPoint.x);
+    
+	[view setCenter:translatedPoint];
+    /*
+	if([(UIPanGestureRecognizer*)sender state] == UIGestureRecognizerStateEnded) {
+        
+		CGFloat finalX = translatedPoint.x + (.35*[(UIPanGestureRecognizer*)sender velocityInView:view].y);
+		CGFloat finalY = translatedPoint.y - (.35*[(UIPanGestureRecognizer*)sender velocityInView:view].x);
+        
+		//if(UIDeviceOrientationIsPortrait([[UIDevice currentDevice] orientation])) {
+			if(finalX < 0) finalX = 0; else if(finalX > 768) finalX = 768;
+			if(finalY < 0) finalY = 0; else if(finalY > 1024) finalY = 1024;
+		///}
+
+		[UIView beginAnimations:nil context:NULL];
+		[UIView setAnimationDuration:.35];
+		[UIView setAnimationCurve:UIViewAnimationCurveEaseOut];
+		[view setCenter:CGPointMake(finalX, finalY)];
+		[UIView commitAnimations];
+	}*/
+}
+
+-(void)tapped:(id)sender {
+	NSLog(@"See a tap gesture");
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -530,10 +657,17 @@ ServerBrowser* networkServerBrowser = 0;
 
 - (void)viewDidLoad {
     [super viewDidLoad];
+
+    // fetch an url for commands?
+
     if(serverurl && serverurl.length > 1) {
         // preferentially try to visit url to get commands to run
         [self pollNetwork:self];
-    } else {
+    }
+    
+    // or play a local file or first file
+    
+    else {
         if(defaultFile) {
             // try play that
             playme = [self findFile:defaultFile];
@@ -549,11 +683,14 @@ ServerBrowser* networkServerBrowser = 0;
         }
     }
 
+    // um? what? xxx
+    
     [[NSNotificationCenter defaultCenter] removeObserver:self
                                                     name:MPMoviePlayerPlaybackDidFinishNotification
                                                   object:moviePlayer];
+    
+    // start a small bonjour listener to listen for local commands from a command and control system
 
-    // start a small bonjour listener
     //[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(networkServiceFound:) name:@"NetworkServiceFound" object:nil];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(networkTrafficReceived:) name:@"NetworkTrafficReceived" object:nil];
     networkServerBrowser = [[ServerBrowser alloc] init];
