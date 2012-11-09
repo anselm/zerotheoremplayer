@@ -1,6 +1,6 @@
 
 #import <Foundation/Foundation.h>
-//#import <CFNetwork/CFSocketStream.h>
+#import <CFNetwork/CFSocketStream.h>
 
 
 @class Connection;

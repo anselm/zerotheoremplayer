@@ -8,7 +8,7 @@ extern bool useexternal ;
 extern bool useavplayer ;
 extern int fillmode ;
 extern int loopmode ;
-
+extern int rotated;
 
 @implementation FilePicker
 
@@ -97,6 +97,13 @@ NSString* text = @"http://hook.org/l/files.json";
     //   NSLog(@"switchAction: sender = %d, isOn %d", [sender tag], [sender isOn]);
     
     useexternal = [sender isOn] ? 1 : 0;
+}
+
+- (void)segmentRotated:(UISegmentedControl*)sender {
+    if ([activeTextField canResignFirstResponder])
+		[activeTextField resignFirstResponder];
+    
+    rotated = [sender selectedSegmentIndex];
 }
 
 
@@ -215,7 +222,22 @@ NSString* text = @"http://hook.org/l/files.json";
     
     //playerTextField.frame = CGRectMake(80.0, 210.0, 160.0, 40.0);
     [self.view addSubview:playerTextField];
+
     
+    ////////////////////////////////////////
+    // rotate
+    {
+        UISegmentedControl *e = [ [ UISegmentedControl alloc ] initWithFrame:CGRectMake(60, 40*6,400, 30)  ];
+        [ e insertSegmentWithTitle: @"rot0" atIndex: 0 animated: NO ];
+        [ e insertSegmentWithTitle: @"rot1" atIndex: 1 animated: NO ];
+        [ e insertSegmentWithTitle: @"rot2" atIndex: 2 animated: NO ];
+        [ e insertSegmentWithTitle: @"rot3" atIndex: 3 animated: NO ];
+        e.selectedSegmentIndex = rotated;
+        e.tag = 9;
+        [e addTarget:self action:@selector(segmentRotated:) forControlEvents:UIControlEventValueChanged];
+        [self.view addSubview: e ];
+    }
+
     ////////////////////////////////////////////
     // button
     

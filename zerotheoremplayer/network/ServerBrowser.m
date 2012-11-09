@@ -5,6 +5,10 @@
 
 @synthesize servers,server,connection;
 
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// we begin by making a netservice browser - with all events being listened to here
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 - (id)init {
     servers = [[NSMutableArray alloc] init];
     server = nil;
@@ -41,92 +45,9 @@
     server = nil;
 }
 
-////////////////////////////////////////////////////////////////////////////////////
-//other listeners
-////////////////////////////////////////////////////////////////////////////////////
-
-- (void)netService:(NSNetService *)sender didNotPublish:(NSDictionary *)errorDict {
-    NSLog(@"netservice did not publish");
-}
-
-- (void)netService:(NSNetService *)sender didNotResolve:(NSDictionary *)errorDict {
-    NSLog(@"netservice did not resolve");
-}
-
-- (void)netService:(NSNetService *)sender didUpdateTXTRecordData:(NSData *)data {
-    NSLog(@"netservice did update txt");
-}
-
-- (void)netServiceDidPublish:(NSNetService *)sender {
-    NSLog(@"netservice did publish");
-}
-
-- (void)netServiceDidResolveAddress:(NSNetService *)sender {
-    NSLog(@"netservice did resolve");
-   // NSNotification* notification = [NSNotification notificationWithName:@"NetworkServiceFound" object:self];
-   // [[NSNotificationCenter defaultCenter] postNotification:notification];
-
-    //NSNotification* notification = [NSNotification notificationWithName:@"NetworkServiceFound" object:self];
-    //[[NSNotificationCenter defaultCenter] postNotification:notification];
-    if(!connection) {
-        connection = [[Connection alloc] initWithNetService:server];
-        connection.delegate = self;
-        [connection connect];
-    }
-
-}
-
-- (void)netServiceDidStop:(NSNetService *)sender {
-    NSLog(@"netservice success");
-}
-
-- (void)netServiceWillPublish:(NSNetService *)sender {
-    NSLog(@"netservice will publish");
-}
-
-- (void)netServiceWillResolve:(NSNetService *)sender {
-    NSLog(@"netservice will resolve");
-   // NSNotification* notification = [NSNotification notificationWithName:@"NetworkServiceFound" object:self];
-   // [[NSNotificationCenter defaultCenter] postNotification:notification];
-}
-
-// Verifies [netService addresses]
-- (BOOL)addressesComplete:(NSArray *)addresses
-           forServiceType:(NSString *)serviceType
-{
-    NSLog(@"netservice addr complete");
-    // Perform appropriate logic to ensure that [netService addresses]
-    // contains the appropriate information to connect to the service
-    return YES;
-}
-
-// Error handling code
-- (void)handleError:(NSNumber *)error withService:(NSNetService *)service
-{
-    NSLog(@"An error occurred with service %@.%@.%@, error code = %@",
-          [service name], [service type], [service domain], error);
-    // Handle error here
-}
-
-
-////////////////////
-
-- (void) connectionAttemptFailed:(Connection*)_connection {
-    NSLog(@"Connection attempt failed");
-}
-- (void) connectionTerminated:(Connection*)_connection {
-    NSLog(@"Connection Terminated");
-    connection = nil;
-}
-
-- (void) receivedNetworkPacket:(NSDictionary*)dict viaConnection:(Connection*)_connection {
-    NSNotification* notification = [NSNotification notificationWithName:@"NetworkTrafficReceived" object:self userInfo:dict];
-    [[NSNotificationCenter defaultCenter] postNotification:notification];
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////////
-// listening for changes to netservice state
-/////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// after we start a netservice browser we now listen for services and will kick off a connection if we find one
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 - (void)netServiceBrowser:(NSNetServiceBrowser *)netServiceBrowser didFindDomain:(NSString *)domainName moreComing:(BOOL)moreDomainsComing {
     NSLog(@"network did find domain");
@@ -145,7 +66,7 @@
 }
 
 - (void)netServiceBrowser:(NSNetServiceBrowser *)netServiceBrowser didFindService:(NSNetService *)netService moreComing:(BOOL)moreServicesComing {
-    if (!server) {
+    if (!server && !connection) {
         server = netService;
         [servers addObject:server];
         [server retain];
@@ -158,7 +79,84 @@
 }
 
 - (void)netServiceBrowser:(NSNetServiceBrowser *)netServiceBrowser didRemoveService:(NSNetService *)netService moreComing:(BOOL)moreServicesComing {
-    server = nil;
+    if(server) {
+        // XXX should I free memory
+        [server stop];
+        server = nil;
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// after we found a server we attempt to connect to it and get an ordinary ip address so we can do an ordinary tcp connection
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+- (void)netService:(NSNetService *)sender didNotPublish:(NSDictionary *)errorDict {
+    NSLog(@"netservice did not publish");
+}
+
+- (void)netService:(NSNetService *)sender didNotResolve:(NSDictionary *)errorDict {
+    NSLog(@"netservice did not resolve");
+}
+
+- (void)netService:(NSNetService *)sender didUpdateTXTRecordData:(NSData *)data {
+    NSLog(@"netservice did update txt");
+}
+
+- (void)netServiceWillPublish:(NSNetService *)sender {
+    NSLog(@"netservice will publish");
+}
+
+- (void)netServiceDidPublish:(NSNetService *)sender {
+    NSLog(@"netservice did publish");
+}
+
+- (void)netServiceWillResolve:(NSNetService *)sender {
+    NSLog(@"netservice will resolve");
+}
+
+- (void)netServiceDidResolveAddress:(NSNetService *)sender {
+    NSLog(@"netservice did resolve");
+    if(!connection) {
+        connection = [[Connection alloc] initWithNetService:server];
+        connection.delegate = self;
+        [connection connect];
+    }
+
+}
+
+- (void)netServiceDidStop:(NSNetService *)sender {
+    NSLog(@"netservice has successfully finished");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// after we have a connection we basically just watch for any disconnects - or actual data
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+- (void) connectionAttemptFailed:(Connection*)_connection {
+    NSLog(@"Connection attempt failed");
+    if(connection) {
+        [connection close];
+        connection = 0;
+    }
+}
+
+- (void) connectionTerminated:(Connection*)_connection {
+    NSLog(@"Connection terminated");
+    if(connection) {
+        // XXX should I free memory
+        [connection close];
+        connection = 0;
+    }
+    if(server) {
+        // XXX should I free memory
+        [server stop];
+        server = 0;
+    }
+}
+
+- (void) receivedNetworkPacket:(NSDictionary*)dict viaConnection:(Connection*)_connection {
+    NSNotification* notification = [NSNotification notificationWithName:@"NetworkTrafficReceived" object:self userInfo:dict];
+    [[NSNotificationCenter defaultCenter] postNotification:notification];
 }
 
 @end

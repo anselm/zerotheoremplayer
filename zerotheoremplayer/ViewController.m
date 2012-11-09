@@ -10,6 +10,7 @@ extern bool useavplayer;
 extern bool useexternal;
 extern int fillmode;
 extern int loopmode;
+extern int rotated;
 NSString* defaultFile = 0;
 int nloops = 0;
 
@@ -175,7 +176,8 @@ UIView* localview;
     if(moviePlayer) {
         if(!loopmode) {
             // because the end of some movies is not black
-            [moviePlayer setCurrentPlaybackTime:0];
+            [moviePlayer setCurrentPlaybackTime:2];
+            [moviePlayer play];
         }
         //MPMoviePlayerController *moviePlayer = [notification object];
         //[[NSNotificationCenter defaultCenter] removeObserver:self name:MPMoviePlayerControllerPlaybackDidFinishNotification object:moviePlayer];
@@ -276,17 +278,23 @@ UIView* localview;
             [external_window addSubview:moviePlayer.view];
         } else {
             CGRect bounds = [[UIScreen mainScreen] bounds];
-            //if(bounds.size.width < bounds.size.height) {
-            //    float temp = bounds.size.width;
-            //    bounds.size.width = bounds.size.height;
-            //    bounds.size.height = temp;
-            //}
+            if(bounds.size.width < bounds.size.height) {
+                float temp = bounds.size.width;
+                bounds.size.width = bounds.size.height;
+                bounds.size.height = temp;
+            }
            // self.view.transform = CGAffineTransformMakeRotation(M_PI_2);
            // [self.view setTransform:CGAffineTransformMakeScale(1.0, 1.0)];
             [moviePlayer.view setFrame:bounds];
             [self.view addSubview:moviePlayer.view];
             //[moviePlayer.view setTransform:CGAffineTransformMakeScale(1.0, 1.0)];
-            //[moviePlayer.view setTransform:CGAffineTransformMakeRotation(M_PI_2)];
+            if(rotated) {
+                [moviePlayer.view setTransform:CGAffineTransformMakeRotation(M_PI_2*rotated)]; // rotate
+            }
+            if(rotated&1) {
+                CGFloat scale = 1.4;
+                [moviePlayer.view setTransform:CGAffineTransformScale(moviePlayer.view.transform, scale, scale)];
+            }
         }
 
         [[NSNotificationCenter defaultCenter] removeObserver:self
@@ -305,6 +313,10 @@ UIView* localview;
                                                  selector:@selector(moviePlaybackComplete:)
                                                      name:MPMoviePlayerDidExitFullscreenNotification
                                                    object:nil];
+
+        //////////////////////////////////////////////////////////////////////
+        // play
+        //////////////////////////////////////////////////////////////////////
         
         [moviePlayer setControlStyle:MPMovieControlStyleNone];
         moviePlayer.fullscreen = YES;
@@ -312,6 +324,9 @@ UIView* localview;
         moviePlayer.repeatMode = loopmode ? 1 : 0;
         [moviePlayer play];
         NSLog(@"playing a new movie %@",filepathurl);
+        
+
+        localview = self.view;
 
     } else {
 
@@ -341,7 +356,7 @@ UIView* localview;
 
             // always make a local view
             localview = [[UIView alloc] initWithFrame:bounds];
-            localview.backgroundColor = [UIColor yellowColor];
+            localview.backgroundColor = [UIColor blackColor];
             [self.view addSubview:localview];
 
             // decide where to attach av player
@@ -351,7 +366,7 @@ UIView* localview;
                 [externalview.layer addSublayer:avPlayerLayer];
                 [external_window addSubview:externalview];
 
-                // does not fill scn?
+                // does not fill scn? xxx remove todo
                 [externalview setTransform:CGAffineTransformMakeScale(1.1, 1.1)];
 
             } else {
@@ -359,27 +374,7 @@ UIView* localview;
                 [localview.layer addSublayer:avPlayerLayer];
             }
 
-            ////////////////////////////////////////////////////////////////////// gesture recognizers
-            
-            UIPinchGestureRecognizer *pinchRecognizer = [[UIPinchGestureRecognizer alloc] initWithTarget:self action:@selector(scale:)];
-            [pinchRecognizer setDelegate:self];
-            [localview addGestureRecognizer:pinchRecognizer];
 
-            UIRotationGestureRecognizer *rotationRecognizer = [[UIRotationGestureRecognizer alloc] initWithTarget:self action:@selector(rotate:)];
-            [rotationRecognizer setDelegate:self];
-            [localview addGestureRecognizer:rotationRecognizer];
-
-            UIPanGestureRecognizer *panRecognizer = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(move:)];
-            [panRecognizer setMinimumNumberOfTouches:1];
-            [panRecognizer setMaximumNumberOfTouches:1];
-            [panRecognizer setDelegate:self];
-            [localview addGestureRecognizer:panRecognizer];
-
-            UITapGestureRecognizer *tapRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapped:)];
-            [tapRecognizer setNumberOfTapsRequired:1];
-            [tapRecognizer setDelegate:self];
-            [localview addGestureRecognizer:tapRecognizer];
-            
         }
         
         ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -391,6 +386,7 @@ UIView* localview;
             AVAsset *asset = [AVURLAsset URLAssetWithURL:filepathurl options:nil];
             AVPlayerItem *playerItem = [AVPlayerItem playerItemWithAsset:asset];
             [player replaceCurrentItemWithPlayerItem:playerItem];
+            //[player seekToTime:kCMTimeZero];
         }
 
         ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -419,6 +415,30 @@ UIView* localview;
         // [asset load];
 
     }
+    
+    //////////////////////////////////////////////////////////////////////
+    // gesture recognizers
+    //////////////////////////////////////////////////////////////////////
+    
+    
+    UIPinchGestureRecognizer *pinchRecognizer = [[UIPinchGestureRecognizer alloc] initWithTarget:self action:@selector(scale:)];
+    [pinchRecognizer setDelegate:self];
+    [localview addGestureRecognizer:pinchRecognizer];
+    
+    UIRotationGestureRecognizer *rotationRecognizer = [[UIRotationGestureRecognizer alloc] initWithTarget:self action:@selector(rotate:)];
+    [rotationRecognizer setDelegate:self];
+    [localview addGestureRecognizer:rotationRecognizer];
+    
+    UIPanGestureRecognizer *panRecognizer = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(move:)];
+    [panRecognizer setMinimumNumberOfTouches:1];
+    [panRecognizer setMaximumNumberOfTouches:1];
+    [panRecognizer setDelegate:self];
+    [localview addGestureRecognizer:panRecognizer];
+    
+    UITapGestureRecognizer *tapRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapped:)];
+    [tapRecognizer setNumberOfTapsRequired:1];
+    [tapRecognizer setDelegate:self];
+    [localview addGestureRecognizer:tapRecognizer];
 
 }
 

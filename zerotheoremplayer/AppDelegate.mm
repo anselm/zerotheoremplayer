@@ -5,10 +5,11 @@
 #import "ListController.h"
 #import "FilePicker.h"
 
-bool useexternal = 1;
-bool useavplayer = 1;
+bool useexternal = 0;
+bool useavplayer = 0;
 int fillmode = 2;
-int loopmode = 1;
+int loopmode = 0;
+int rotated = 0;
 
 @implementation AppDelegate
 
