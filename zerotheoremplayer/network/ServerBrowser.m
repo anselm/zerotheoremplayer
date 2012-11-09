@@ -6,6 +6,54 @@
 @synthesize servers,server,connection;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// heartbeat
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+float batteryLevel = 0;
+int batteryState = 0;
+
+- (void) heartbeat:(NSTimer*)timer {
+    // send our battery status periodically
+    if(connection) {
+        NSString* power = [NSString stringWithFormat:@"%f",batteryLevel];
+        NSDictionary* dict = [NSDictionary dictionaryWithObjectsAndKeys:
+                              power, @"power",
+                              //[[UIDevice currentDevice] uniqueIdentifier],@"device",
+                              [[UIDevice currentDevice] name],@"name",
+                              [[UIDevice currentDevice] systemName],@"sysname",
+                              [[UIDevice currentDevice] systemVersion],@"version",
+                              [[UIDevice currentDevice] model],@"model",
+                              [[UIDevice currentDevice] localizedModel],@"lmodel",
+                              nil
+                              ];
+        [connection sendNetworkPacket:dict];
+    }
+}
+
+- (void)batteryChanged:(NSNotification *)notification {
+    UIDevice *device = [UIDevice currentDevice];
+    batteryLevel = device.batteryLevel;
+    batteryState = device.batteryState;
+    NSLog(@"State: %i Charge: %f", device.batteryState, device.batteryLevel);
+}
+
+- (void) heartbeatStart {
+    
+    // start power monitor
+    UIDevice *device = [UIDevice currentDevice];
+    device.batteryMonitoringEnabled = YES;
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(batteryChanged:) name:@"UIDeviceBatteryLevelDidChangeNotification" object:device];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(batteryChanged:) name:@"UIDeviceBatteryStateDidChangeNotification" object:device];
+
+    // start publishing a heartbeat
+    float timer=5.0;
+    [NSTimer scheduledTimerWithTimeInterval:timer target:self selector:@selector(heartbeat:) userInfo:nil repeats:YES];
+
+}
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // we begin by making a netservice browser - with all events being listened to here
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -22,6 +70,9 @@
 }
 
 - (BOOL)start {
+
+    [self heartbeatStart];
+    
     if ( netServiceBrowser != nil ) {
         [self stop];
     }
@@ -114,29 +165,13 @@
     NSLog(@"netservice will resolve");
 }
 
-- (void) heartbeat:(NSTimer*)timer {
-    // send our battery status periodically
-    if(connection) {
-        NSDictionary* dict = [NSDictionary dictionaryWithObjectsAndKeys: @"one", @"name", nil];
-        [connection sendNetworkPacket:dict];
-    }
-}
-
 - (void)netServiceDidResolveAddress:(NSNetService *)sender {
     NSLog(@"netservice did resolve");
     if(!connection) {
         connection = [[Connection alloc] initWithNetService:server];
         connection.delegate = self;
         [connection connect];
-        // start publishing a keepalive
     }
-
-    // start publishing a heartbeat
-///    if(connection) {
-//        float timer=5.0;
-//        [NSTimer scheduledTimerWithTimeInterval:timer target:self selector:@selector(heartbeat:) userInfo:nil repeats:YES];
-//    }
-    
 }
 
 - (void)netServiceDidStop:(NSNetService *)sender {

@@ -158,43 +158,10 @@ UIView* localview;
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 // mp player
+// http://stackoverflow.com/questions/4560065/MPMoviePlayerController-switching-movies-causes-white-flash
 /////////////////////////////////////////////////////////////////////////////////////////////
 
 MPMoviePlayerController *moviePlayer;
-
-
-- (void)moviePlaybackComplete:(NSNotification *)notification {
-    nloops++;
-    if(moviePlayer) {
-        if(!loopmode) {
-            // because the end of some movies is not black
-            [moviePlayer setCurrentPlaybackTime:2];
-            [moviePlayer play];
-        }
-        //MPMoviePlayerController *moviePlayer = [notification object];
-        //[[NSNotificationCenter defaultCenter] removeObserver:self name:MPMoviePlayerControllerPlaybackDidFinishNotification object:moviePlayer];
-        //[moviePlayer.view removeFromSuperview];
-        //[moviePlayer release];
-        int reason = [[[notification userInfo] objectForKey:MPMoviePlayerPlaybackDidFinishReasonUserInfoKey] intValue];
-        if(reason == MPMovieFinishReasonPlaybackEnded) {
-            NSLog(@"Reason: MPMovieFinishReasonPlaybackEnded");
-        }
-        else if(reason == MPMovieFinishReasonPlaybackError) {
-            NSLog(@"Reason: MPMovieFinishReasonPlaybackError");
-        }
-        else if(reason == MPMovieFinishReasonUserExited) {
-            NSLog(@"Reason: MPMovieFinishReasonUserExited");
-        }
-        else {
-            NSLog(@"Reason: %d", reason);
-        }
-    }
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////////
-// start or restart movie player - using a movie player format
-// http://stackoverflow.com/questions/4560065/MPMoviePlayerController-switching-movies-causes-white-flash
-/////////////////////////////////////////////////////////////////////////////////////////////
 
 - (void) setupMoviePlayer:(NSURL*)filepathurl {
 
@@ -277,6 +244,38 @@ MPMoviePlayerController *moviePlayer;
     // set this globally
     
     localview = self.view;
+}
+
+
+- (void)moviePlaybackComplete:(NSNotification *)notification {
+    nloops++;
+    if(moviePlayer) {
+
+        // we no longer allow a non looping mode - this just jumps 2 seconds in as a way to avoid black
+        
+        if(!loopmode) {
+            // because the end of some movies is not black
+            [moviePlayer setCurrentPlaybackTime:2];
+            [moviePlayer play];
+        }
+        //MPMoviePlayerController *moviePlayer = [notification object];
+        //[[NSNotificationCenter defaultCenter] removeObserver:self name:MPMoviePlayerControllerPlaybackDidFinishNotification object:moviePlayer];
+        //[moviePlayer.view removeFromSuperview];
+        //[moviePlayer release];
+        int reason = [[[notification userInfo] objectForKey:MPMoviePlayerPlaybackDidFinishReasonUserInfoKey] intValue];
+        if(reason == MPMovieFinishReasonPlaybackEnded) {
+            NSLog(@"Reason: MPMovieFinishReasonPlaybackEnded");
+        }
+        else if(reason == MPMovieFinishReasonPlaybackError) {
+            NSLog(@"Reason: MPMovieFinishReasonPlaybackError");
+        }
+        else if(reason == MPMovieFinishReasonUserExited) {
+            NSLog(@"Reason: MPMovieFinishReasonUserExited");
+        }
+        else {
+            NSLog(@"Reason: %d", reason);
+        }
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -376,10 +375,21 @@ CMTime duration;
 - (void)playerItemDidReachEnd:(NSNotification *)notification {
     if(player) {
         nloops++;
+
+        // don't allow a non looping mode for now - treat a non looping mode as a request to manually skip 2 seconds in to avoid black pauses
+
         //    if(loopmode) {
-        AVPlayerItem *p = [notification object];
-        [p seekToTime:kCMTimeZero];
+        //AVPlayerItem *p = [notification object];
+        //[p seekToTime:kCMTimeZero];
         //   }
+
+        Float64 seconds = 2;
+        int32_t preferredTimeScale = 25;
+        CMTime inTime = CMTimeMakeWithSeconds(seconds, preferredTimeScale);
+        [player seekToTime:inTime];
+        nloops = 0;
+
+    
     }
 }
 
@@ -560,10 +570,13 @@ static float firstX = 0.0, firstY = 0.0;
 		firstY = [view center].y;
 	}
 
-    if(external_screen) {
+    if(player && !external_screen) {
+        translatedPoint = CGPointMake(firstX+translatedPoint.x, firstY+translatedPoint.y);
+    }
+    else if(external_screen) {
         translatedPoint = CGPointMake(firstX+translatedPoint.y, firstY-translatedPoint.x);
     } else {
-        translatedPoint = CGPointMake(firstX+translatedPoint.x, firstY+translatedPoint.y);
+        translatedPoint = CGPointMake(firstX-translatedPoint.y, firstY+translatedPoint.x);
     }
 
 	[view setCenter:translatedPoint];
@@ -810,6 +823,16 @@ ServerBrowser* networkServerBrowser = 0;
 
 }
 
+/*
+ 
+nov 10 2012
+ 
+  - cannot scale mpmovie player for some reason
+  - publish heart beat
+  - have a way to change videos and servers without quitting
+  - 
+ 
+ */
 
 @end
 
