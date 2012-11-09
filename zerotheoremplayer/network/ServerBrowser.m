@@ -114,14 +114,29 @@
     NSLog(@"netservice will resolve");
 }
 
+- (void) heartbeat:(NSTimer*)timer {
+    // send our battery status periodically
+    if(connection) {
+        NSDictionary* dict = [NSDictionary dictionaryWithObjectsAndKeys: @"one", @"name", nil];
+        [connection sendNetworkPacket:dict];
+    }
+}
+
 - (void)netServiceDidResolveAddress:(NSNetService *)sender {
     NSLog(@"netservice did resolve");
     if(!connection) {
         connection = [[Connection alloc] initWithNetService:server];
         connection.delegate = self;
         [connection connect];
+        // start publishing a keepalive
     }
 
+    // start publishing a heartbeat
+///    if(connection) {
+//        float timer=5.0;
+//        [NSTimer scheduledTimerWithTimeInterval:timer target:self selector:@selector(heartbeat:) userInfo:nil repeats:YES];
+//    }
+    
 }
 
 - (void)netServiceDidStop:(NSNetService *)sender {
@@ -134,21 +149,17 @@
 
 - (void) connectionAttemptFailed:(Connection*)_connection {
     NSLog(@"Connection attempt failed");
-    if(connection) {
-        [connection close];
-        connection = 0;
-    }
+    // connection will delete itself
+    connection = 0;
 }
 
 - (void) connectionTerminated:(Connection*)_connection {
     NSLog(@"Connection terminated");
-    if(connection) {
-        // XXX should I free memory
-        [connection close];
-        connection = 0;
-    }
+    // connection will delete itself
+    connection = 0;
+    // we kill server so that we start listening for new servers
     if(server) {
-        // XXX should I free memory
+        // XXX should I free memory?
         [server stop];
         server = 0;
     }

@@ -91,7 +91,7 @@ void writeStreamEventHandler(CFWriteStreamRef stream, CFStreamEventType eventTyp
 - (void)dealloc {
     self.netService = nil;
     self.host = nil;
-    self.delegate = nil;
+    // xxx never do this self.delegate = nil;
     
     [super dealloc];
 }
@@ -246,6 +246,18 @@ void writeStreamEventHandler(CFWriteStreamRef stream, CFStreamEventType eventTyp
     
     // Reset all other variables
     [self clean];
+
+    // this has to be last
+    // If we haven't connected yet then our connection attempt has failed
+    if(delegate) {
+        if ( !readStreamOpen || !writeStreamOpen ) {
+            [delegate connectionAttemptFailed:self];
+        }
+        else {
+            [delegate connectionTerminated:self];
+        }
+    }
+
 }
 
 
@@ -291,14 +303,6 @@ void readStreamEventHandler(CFReadStreamRef stream, CFStreamEventType eventType,
     else if ( event == kCFStreamEventEndEncountered || event == kCFStreamEventErrorOccurred ) {
         // Clean everything up
         [self close];
-        
-        // If we haven't connected yet then our connection attempt has failed
-        if ( !readStreamOpen || !writeStreamOpen ) {
-            [delegate connectionAttemptFailed:self];
-        }
-        else {
-            [delegate connectionTerminated:self];
-        }
     }
 }
 
@@ -314,7 +318,6 @@ void readStreamEventHandler(CFReadStreamRef stream, CFStreamEventType eventType,
         if ( len <= 0 ) {
             // Either stream was closed or error occurred. Close everything up and treat this as "connection terminated"
             [self close];
-            [delegate connectionTerminated:self];
             return;
         }
         
@@ -394,14 +397,6 @@ void writeStreamEventHandler(CFWriteStreamRef stream, CFStreamEventType eventTyp
     else if ( event == kCFStreamEventEndEncountered || event == kCFStreamEventErrorOccurred ) {
         // Clean everything up
         [self close];
-        
-        // If we haven't connected yet then our connection attempt has failed
-        if ( !readStreamOpen || !writeStreamOpen ) {
-            [delegate connectionAttemptFailed:self];
-        }
-        else {
-            [delegate connectionTerminated:self];
-        }
     }
 }
 
@@ -430,7 +425,6 @@ void writeStreamEventHandler(CFWriteStreamRef stream, CFStreamEventType eventTyp
     if ( writtenBytes == -1 ) {
         // Error occurred. Close everything up.
         [self close];
-        [delegate connectionTerminated:self];
         return;
     }
     
@@ -449,7 +443,6 @@ void writeStreamEventHandler(CFWriteStreamRef stream, CFStreamEventType eventTyp
     }
     
     // Close everything and tell delegate that we have failed
-    [delegate connectionAttemptFailed:self];
     [self close];
 }
 
@@ -469,7 +462,6 @@ void writeStreamEventHandler(CFWriteStreamRef stream, CFStreamEventType eventTyp
     
     // Connect!
     if ( ![self connect] ) {
-        [delegate connectionAttemptFailed:self];
         [self close];
     }
 }

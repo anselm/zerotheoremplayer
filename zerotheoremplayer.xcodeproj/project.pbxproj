@@ -32,7 +32,6 @@
 		4360251D1636909000B8D2F4 /* ViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 4360251C1636909000B8D2F4 /* ViewController.m */; };
 		4396C1F6163E9F42008BA00D /* ListController.m in Sources */ = {isa = PBXBuildFile; fileRef = 4396C1F5163E9F42008BA00D /* ListController.m */; };
 		4396C243163F169E008BA00D /* Connection.m in Sources */ = {isa = PBXBuildFile; fileRef = 4396C235163F169E008BA00D /* Connection.m */; };
-		4396C247163F169E008BA00D /* Server.m in Sources */ = {isa = PBXBuildFile; fileRef = 4396C23D163F169E008BA00D /* Server.m */; };
 		4396C248163F169E008BA00D /* ServerBrowser.m in Sources */ = {isa = PBXBuildFile; fileRef = 4396C23F163F169E008BA00D /* ServerBrowser.m */; };
 		4396C250163FC77F008BA00D /* AppDelegate.mm in Sources */ = {isa = PBXBuildFile; fileRef = 4396C24F163FC77F008BA00D /* AppDelegate.mm */; };
 		43AD439A1642FEE700356C33 /* FilePicker.m in Sources */ = {isa = PBXBuildFile; fileRef = 43AD43991642FEE700356C33 /* FilePicker.m */; };
@@ -72,8 +71,6 @@
 		4396C1F5163E9F42008BA00D /* ListController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ListController.m; sourceTree = "<group>"; };
 		4396C234163F169E008BA00D /* Connection.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Connection.h; sourceTree = "<group>"; };
 		4396C235163F169E008BA00D /* Connection.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = Connection.m; sourceTree = "<group>"; };
-		4396C23C163F169E008BA00D /* Server.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Server.h; sourceTree = "<group>"; };
-		4396C23D163F169E008BA00D /* Server.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = Server.m; sourceTree = "<group>"; };
 		4396C23E163F169E008BA00D /* ServerBrowser.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ServerBrowser.h; sourceTree = "<group>"; };
 		4396C23F163F169E008BA00D /* ServerBrowser.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ServerBrowser.m; sourceTree = "<group>"; };
 		4396C24F163FC77F008BA00D /* AppDelegate.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = AppDelegate.mm; sourceTree = "<group>"; };
@@ -180,8 +177,6 @@
 			children = (
 				4396C234163F169E008BA00D /* Connection.h */,
 				4396C235163F169E008BA00D /* Connection.m */,
-				4396C23C163F169E008BA00D /* Server.h */,
-				4396C23D163F169E008BA00D /* Server.m */,
 				4396C23E163F169E008BA00D /* ServerBrowser.h */,
 				4396C23F163F169E008BA00D /* ServerBrowser.m */,
 			);
@@ -268,7 +263,6 @@
 				4360251D1636909000B8D2F4 /* ViewController.m in Sources */,
 				4396C1F6163E9F42008BA00D /* ListController.m in Sources */,
 				4396C243163F169E008BA00D /* Connection.m in Sources */,
-				4396C247163F169E008BA00D /* Server.m in Sources */,
 				4396C248163F169E008BA00D /* ServerBrowser.m in Sources */,
 				4396C250163FC77F008BA00D /* AppDelegate.mm in Sources */,
 				43AD439A1642FEE700356C33 /* FilePicker.m in Sources */,

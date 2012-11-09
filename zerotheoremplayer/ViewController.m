@@ -148,28 +148,20 @@ int poll_count = 0;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
-// movie play
+// shared
 /////////////////////////////////////////////////////////////////////////////////////////////
 
-MPMoviePlayerController *moviePlayer;
 UIScreen* external_screen;
 UIWindow* external_window;
-AVPlayer *player;
-AVPlayerItem *playerItem;
-AVPlayerLayer *playerLayer;
-CMTime duration;
 UIView* externalview;
 UIView* localview;
 
-- (void)playerItemDidReachEnd:(NSNotification *)notification {
-    if(player) {
-        nloops++;
-        //    if(loopmode) {
-        AVPlayerItem *p = [notification object];
-        [p seekToTime:kCMTimeZero];
-        //   }
-    }
-}
+/////////////////////////////////////////////////////////////////////////////////////////////
+// mp player
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+MPMoviePlayerController *moviePlayer;
+
 
 - (void)moviePlaybackComplete:(NSNotification *)notification {
     nloops++;
@@ -199,35 +191,253 @@ UIView* localview;
     }
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////////
+// start or restart movie player - using a movie player format
+// http://stackoverflow.com/questions/4560065/MPMoviePlayerController-switching-movies-causes-white-flash
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+- (void) setupMoviePlayer:(NSURL*)filepathurl {
+
+    // remove old listeners if any
+
+    if(moviePlayer) {
+        [[NSNotificationCenter defaultCenter] removeObserver:self
+                                                        name:MPMoviePlayerPlaybackDidFinishNotification
+                                                      object:moviePlayer];
+        [[NSNotificationCenter defaultCenter] removeObserver:self
+                                                        name:MPMoviePlayerDidExitFullscreenNotification
+                                                      object:moviePlayer]; // xxx why is this object moviePlayer
+    }
+    
+    // kill old - no point in doing this later
+    
+    MPMoviePlayerController* old = moviePlayer;
+    
+    if(old) {
+        //old.scalingMode = MPMovieScalingModeNone;
+        //[old setFullscreen:NO];
+        [old.view removeFromSuperview];
+        [old stop];
+        [old release];
+    }
+    
+    moviePlayer = [[MPMoviePlayerController alloc] initWithContentURL:filepathurl];
+
+    // attach to appropriate window
+    
+    if(external_window) {
+        [external_window addSubview:moviePlayer.view];
+    } else {
+        CGRect bounds = [[UIScreen mainScreen] bounds];
+        if(bounds.size.width < bounds.size.height) {
+            float temp = bounds.size.width;
+            bounds.size.width = bounds.size.height;
+            bounds.size.height = temp;
+        }
+        // self.view.transform = CGAffineTransformMakeRotation(M_PI_2);
+        // [self.view setTransform:CGAffineTransformMakeScale(1.0, 1.0)];
+        [moviePlayer.view setFrame:bounds];
+        [self.view addSubview:moviePlayer.view];
+        //[moviePlayer.view setTransform:CGAffineTransformMakeScale(1.0, 1.0)];
+    }
+
+    // rotation
+    
+    if(rotated) {
+        [moviePlayer.view setTransform:CGAffineTransformMakeRotation(M_PI_2*rotated)]; // rotate
+    }
+    if(rotated&1) {
+        CGFloat scale = 1.4;
+        [moviePlayer.view setTransform:CGAffineTransformScale(moviePlayer.view.transform, scale, scale)];
+    }
+
+    // re add listeners
+    
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(moviePlaybackComplete:)
+                                                 name:MPMoviePlayerPlaybackDidFinishNotification
+                                               object:nil];
+    
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(moviePlaybackComplete:)
+                                                 name:MPMoviePlayerDidExitFullscreenNotification
+                                               object:nil];
+    
+    //////////////////////////////////////////////////////////////////////
+    // play
+    //////////////////////////////////////////////////////////////////////
+    
+    [moviePlayer setControlStyle:MPMovieControlStyleNone];
+    moviePlayer.fullscreen = YES;
+    moviePlayer.scalingMode = MPMovieScalingModeFill;
+    moviePlayer.repeatMode = loopmode ? 1 : 0;
+    [moviePlayer play];
+    NSLog(@"playing a new movie %@",filepathurl);
+    
+    // set this globally
+    
+    localview = self.view;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+// avplayer
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+AVPlayer *player;
+AVPlayerItem *playerItem;
+AVPlayerLayer *playerLayer;
+CMTime duration;
+
+- (void) setupAVPlayer:(NSURL*)filepathurl {
+    
+    if(!player) {
+        
+        // get the assets
+        AVAsset *asset = [AVURLAsset URLAssetWithURL:filepathurl options:nil];
+        AVPlayerItem *playerItem = [AVPlayerItem playerItemWithAsset:asset];
+        player = [[AVPlayer playerWithPlayerItem:playerItem] retain];
+        duration = player.currentItem.asset.duration;
+        
+        // get bounds of target
+        CGRect bounds = [self.view bounds];
+        if(external_window) {
+            bounds = [external_window bounds];
+        }
+        
+        // make av player
+        AVPlayerLayer *avPlayerLayer = [[AVPlayerLayer playerLayerWithPlayer:player] retain];
+        [avPlayerLayer setFrame:bounds];
+        playerLayer.videoGravity = AVLayerVideoGravityResizeAspectFill; // this is the key line to fill display edge to edge
+        NSLog(@"avplayer bounds are %f,%f",bounds.size.width,bounds.size.height);
+        
+        // always make a local view
+        localview = [[UIView alloc] initWithFrame:bounds];
+        localview.backgroundColor = [UIColor blackColor];
+        [self.view addSubview:localview];
+        
+        // decide where to attach av player
+        if(external_window) {
+            externalview = [[UIView alloc] initWithFrame:bounds];
+            externalview.backgroundColor = [UIColor blackColor];
+            [externalview.layer addSublayer:avPlayerLayer];
+            [external_window addSubview:externalview];
+            
+            // does not fill scn? xxx remove todo
+            [externalview setTransform:CGAffineTransformMakeScale(1.1, 1.1)];
+            
+        } else {
+            localview.backgroundColor = [UIColor blackColor];
+            [localview.layer addSublayer:avPlayerLayer];
+        }
+        
+        
+    }
+    
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    // just load something new into the player
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    
+    else {
+        [player pause];
+        AVAsset *asset = [AVURLAsset URLAssetWithURL:filepathurl options:nil];
+        AVPlayerItem *playerItem = [AVPlayerItem playerItemWithAsset:asset];
+        [player replaceCurrentItemWithPlayerItem:playerItem];
+        //[player seekToTime:kCMTimeZero];
+    }
+    
+    // play it
+    
+    //playerLayer.needsDisplayOnBoundsChange = YES;
+    //playbackView.layer.needsDisplayOnBoundsChange = YES;
+    
+    [player play];
+    
+    // do this more than once??? XXX todo
+    
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(playerItemDidReachEnd:)
+                                                 name:AVPlayerItemDidPlayToEndTimeNotification
+                                               object:[player currentItem]];
+    
+    
+    player.actionAtItemEnd = AVPlayerActionAtItemEndNone;
+    
+    
+    NSLog(@"playing a new movie %@",filepathurl);
+    
+    //[player pause];
+    //[player replaceCurrentItemWithPlayerItem:newPlayerItem];
+    
+    // [asset load];
+    
+}
+
+
+- (void)playerItemDidReachEnd:(NSNotification *)notification {
+    if(player) {
+        nloops++;
+        //    if(loopmode) {
+        AVPlayerItem *p = [notification object];
+        [p seekToTime:kCMTimeZero];
+        //   }
+    }
+}
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+// bad ideas
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+// This approach is slow and or fails to copy opengl
+//    [[TVOutManager sharedInstance] startTVOut];
+
+/*
+ This approach lacks any kind of high fidelity control
+ UIWebView* videoView;
+ 
+ CGRect bounds = [[UIScreen mainScreen] bounds];
+ NSBundle *bundle = [NSBundle mainBundle];
+ NSString* html = @"<video src=\"big-buck-bunny-clip.m4v\" width=640 height-480 control controls fullscreen allowFullScreen autoplay loop></video>";
+ if (videoView == nil) {
+ videoView = [[UIWebView alloc] initWithFrame:bounds];
+ [self.view addSubview:videoView];
+ }
+ [videoView loadHTMLString:html baseURL:[bundle resourceURL]];
+ if(1)return;
+ */
+
+/////////////////////////////////////////////////////////////////////////////////////////////
+// shared
+/////////////////////////////////////////////////////////////////////////////////////////////
+
+UIPinchGestureRecognizer* pinchRecognizer;
+UIRotationGestureRecognizer* rotationRecognizer;
+UIPanGestureRecognizer* panRecognizer;
+UITapGestureRecognizer* tapRecognizer;
+
 -(void)playMovie:(NSURL*) filepathurl {
 
     if(!filepathurl)return;
     
-    /////////////////////////////////////////////////////////////////////////////////////////////
-    // bad ideas
-    /////////////////////////////////////////////////////////////////////////////////////////////
+    // remove gesture recognizers?
 
-    // This approach is slow and or fails to copy opengl
-    //    [[TVOutManager sharedInstance] startTVOut];
-
-/*
-    This approach lacks any kind of high fidelity control
-    UIWebView* videoView;
- 
-    CGRect bounds = [[UIScreen mainScreen] bounds];
-    NSBundle *bundle = [NSBundle mainBundle];
-    NSString* html = @"<video src=\"big-buck-bunny-clip.m4v\" width=640 height-480 control controls fullscreen allowFullScreen autoplay loop></video>";
-    if (videoView == nil) {
-        videoView = [[UIWebView alloc] initWithFrame:bounds];
-        [self.view addSubview:videoView];
+    if(pinchRecognizer && localview) {
+        [localview removeGestureRecognizer:pinchRecognizer];
     }
-    [videoView loadHTMLString:html baseURL:[bundle resourceURL]];
-    if(1)return;
-*/
+    if(panRecognizer && localview) {
+        [localview addGestureRecognizer:panRecognizer];        
+    }
+    if(panRecognizer && localview) {
+        [localview removeGestureRecognizer:panRecognizer];
+    }
+    if(tapRecognizer && localview) {
+        [localview removeGestureRecognizer:tapRecognizer];
+    }
+    if(rotationRecognizer && localview) {
+        [localview removeGestureRecognizer:rotationRecognizer];
+    }
 
-    /////////////////////////////////////////////////////////////////////////////////////////////
-    // find and attach to external screen if desired and exists
-    /////////////////////////////////////////////////////////////////////////////////////////////
+    // setup external?
 
     if (useexternal && !external_window && [[UIScreen screens] count] > 1) {
         UIScreenMode* best = 0;
@@ -256,198 +466,52 @@ UIView* localview;
         }
     }
 
-    /////////////////////////////////////////////////////////////////////////////////////////////
-    // start or restart movie player - using a movie player format
-    // http://stackoverflow.com/questions/4560065/MPMoviePlayerController-switching-movies-causes-white-flash
-    /////////////////////////////////////////////////////////////////////////////////////////////
+    // play the video
 
     if(!useavplayer) {
-        MPMoviePlayerController* old = moviePlayer;
-        
-        if(old) {
-            //old.scalingMode = MPMovieScalingModeNone;
-            //[old setFullscreen:NO];
-            [old.view removeFromSuperview];
-            [old stop];
-            [old release];
-        }
-
-        moviePlayer = [[MPMoviePlayerController alloc] initWithContentURL:filepathurl];
-        
-        if(external_window) {
-            [external_window addSubview:moviePlayer.view];
-        } else {
-            CGRect bounds = [[UIScreen mainScreen] bounds];
-            if(bounds.size.width < bounds.size.height) {
-                float temp = bounds.size.width;
-                bounds.size.width = bounds.size.height;
-                bounds.size.height = temp;
-            }
-           // self.view.transform = CGAffineTransformMakeRotation(M_PI_2);
-           // [self.view setTransform:CGAffineTransformMakeScale(1.0, 1.0)];
-            [moviePlayer.view setFrame:bounds];
-            [self.view addSubview:moviePlayer.view];
-            //[moviePlayer.view setTransform:CGAffineTransformMakeScale(1.0, 1.0)];
-            if(rotated) {
-                [moviePlayer.view setTransform:CGAffineTransformMakeRotation(M_PI_2*rotated)]; // rotate
-            }
-            if(rotated&1) {
-                CGFloat scale = 1.4;
-                [moviePlayer.view setTransform:CGAffineTransformScale(moviePlayer.view.transform, scale, scale)];
-            }
-        }
-
-        [[NSNotificationCenter defaultCenter] removeObserver:self
-                                                        name:MPMoviePlayerPlaybackDidFinishNotification
-                                                      object:moviePlayer];
-        [[NSNotificationCenter defaultCenter] removeObserver:self
-                                                        name:MPMoviePlayerDidExitFullscreenNotification
-                                                      object:moviePlayer]; // xxx why is this object moviePlayer
-        
-        [[NSNotificationCenter defaultCenter] addObserver:self
-                                                 selector:@selector(moviePlaybackComplete:)
-                                                     name:MPMoviePlayerPlaybackDidFinishNotification
-                                                   object:nil];
-        
-        [[NSNotificationCenter defaultCenter] addObserver:self
-                                                 selector:@selector(moviePlaybackComplete:)
-                                                     name:MPMoviePlayerDidExitFullscreenNotification
-                                                   object:nil];
-
-        //////////////////////////////////////////////////////////////////////
-        // play
-        //////////////////////////////////////////////////////////////////////
-        
-        [moviePlayer setControlStyle:MPMovieControlStyleNone];
-        moviePlayer.fullscreen = YES;
-        moviePlayer.scalingMode = MPMovieScalingModeFill;
-        moviePlayer.repeatMode = loopmode ? 1 : 0;
-        [moviePlayer play];
-        NSLog(@"playing a new movie %@",filepathurl);
-        
-
-        localview = self.view;
-
+        [self setupMoviePlayer:filepathurl];
     } else {
-
-        ///////////////////////////////////////////////////////////////////////////////////////////////
-        // attach player to window?
-        ///////////////////////////////////////////////////////////////////////////////////////////////
-        
-        if(!player) {
-            
-            // get the assets
-            AVAsset *asset = [AVURLAsset URLAssetWithURL:filepathurl options:nil];
-            AVPlayerItem *playerItem = [AVPlayerItem playerItemWithAsset:asset];
-            player = [[AVPlayer playerWithPlayerItem:playerItem] retain];
-            duration = player.currentItem.asset.duration;
-
-            // get bounds of target
-            CGRect bounds = [self.view bounds];
-            if(external_window) {
-                bounds = [external_window bounds];
-            }
-
-            // make av player
-            AVPlayerLayer *avPlayerLayer = [[AVPlayerLayer playerLayerWithPlayer:player] retain];
-            [avPlayerLayer setFrame:bounds];
-            playerLayer.videoGravity = AVLayerVideoGravityResizeAspectFill; // this is the key line to fill display edge to edge
-            NSLog(@"avplayer bounds are %f,%f",bounds.size.width,bounds.size.height);
-
-            // always make a local view
-            localview = [[UIView alloc] initWithFrame:bounds];
-            localview.backgroundColor = [UIColor blackColor];
-            [self.view addSubview:localview];
-
-            // decide where to attach av player
-            if(external_window) {
-                externalview = [[UIView alloc] initWithFrame:bounds];
-                externalview.backgroundColor = [UIColor blackColor];
-                [externalview.layer addSublayer:avPlayerLayer];
-                [external_window addSubview:externalview];
-
-                // does not fill scn? xxx remove todo
-                [externalview setTransform:CGAffineTransformMakeScale(1.1, 1.1)];
-
-            } else {
-                localview.backgroundColor = [UIColor blackColor];
-                [localview.layer addSublayer:avPlayerLayer];
-            }
-
-
-        }
-        
-        ///////////////////////////////////////////////////////////////////////////////////////////////
-        // just load something new into the player
-        ///////////////////////////////////////////////////////////////////////////////////////////////
-        
-        else {
-            [player pause];
-            AVAsset *asset = [AVURLAsset URLAssetWithURL:filepathurl options:nil];
-            AVPlayerItem *playerItem = [AVPlayerItem playerItemWithAsset:asset];
-            [player replaceCurrentItemWithPlayerItem:playerItem];
-            //[player seekToTime:kCMTimeZero];
-        }
-
-        ///////////////////////////////////////////////////////////////////////////////////////////////
-        // play it
-        ///////////////////////////////////////////////////////////////////////////////////////////////
-        
-        //playerLayer.needsDisplayOnBoundsChange = YES;
-        //playbackView.layer.needsDisplayOnBoundsChange = YES;
-
-        [player play];
-
-        [[NSNotificationCenter defaultCenter] addObserver:self
-                                                 selector:@selector(playerItemDidReachEnd:)
-                                                     name:AVPlayerItemDidPlayToEndTimeNotification
-                                                   object:[player currentItem]];
-    
-
-        player.actionAtItemEnd = AVPlayerActionAtItemEndNone;
-
-        
-        NSLog(@"playing a new movie %@",filepathurl);
-
-        //[player pause];
-        //[player replaceCurrentItemWithPlayerItem:newPlayerItem];
-
-        // [asset load];
-
+        [self setupAVPlayer:filepathurl];
     }
+
+    // re attach gesture recognizers
     
-    //////////////////////////////////////////////////////////////////////
-    // gesture recognizers
-    //////////////////////////////////////////////////////////////////////
-    
-    
-    UIPinchGestureRecognizer *pinchRecognizer = [[UIPinchGestureRecognizer alloc] initWithTarget:self action:@selector(scale:)];
-    [pinchRecognizer setDelegate:self];
+    if(!pinchRecognizer) {
+        pinchRecognizer = [[UIPinchGestureRecognizer alloc] initWithTarget:self action:@selector(scale:)];
+        [pinchRecognizer setDelegate:self];
+    }
     [localview addGestureRecognizer:pinchRecognizer];
-    
-    UIRotationGestureRecognizer *rotationRecognizer = [[UIRotationGestureRecognizer alloc] initWithTarget:self action:@selector(rotate:)];
-    [rotationRecognizer setDelegate:self];
+
+    if(!rotationRecognizer) {
+        rotationRecognizer = [[UIRotationGestureRecognizer alloc] initWithTarget:self action:@selector(rotate:)];
+        [rotationRecognizer setDelegate:self];
+    }
     [localview addGestureRecognizer:rotationRecognizer];
     
-    UIPanGestureRecognizer *panRecognizer = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(move:)];
-    [panRecognizer setMinimumNumberOfTouches:1];
-    [panRecognizer setMaximumNumberOfTouches:1];
-    [panRecognizer setDelegate:self];
+    if(!panRecognizer) {
+        panRecognizer = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(move:)];
+        [panRecognizer setMinimumNumberOfTouches:1];
+        [panRecognizer setMaximumNumberOfTouches:1];
+        [panRecognizer setDelegate:self];
+    }
     [localview addGestureRecognizer:panRecognizer];
-    
-    UITapGestureRecognizer *tapRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapped:)];
-    [tapRecognizer setNumberOfTapsRequired:1];
-    [tapRecognizer setDelegate:self];
+
+    if(!tapRecognizer) {
+        tapRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapped:)];
+        [tapRecognizer setNumberOfTapsRequired:1];
+        [tapRecognizer setDelegate:self];
+    }
     [localview addGestureRecognizer:tapRecognizer];
 
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// handle events
+// event request handling
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-float lastScale = 1.0;
-float lastRotation = 0.0;
-float firstX = 0.0, firstY = 0.0;
+static float lastScale = 1.0;
+static float lastRotation = 0.0;
+static float firstX = 0.0, firstY = 0.0;
 
 -(void)scale:(id)sender {
     // http://www.icodeblog.com/2010/10/14/working-with-uigesturerecognizers/
@@ -496,8 +560,12 @@ float firstX = 0.0, firstY = 0.0;
 		firstY = [view center].y;
 	}
 
-	translatedPoint = CGPointMake(firstX+translatedPoint.y, firstY-translatedPoint.x);
-    
+    if(external_screen) {
+        translatedPoint = CGPointMake(firstX+translatedPoint.y, firstY-translatedPoint.x);
+    } else {
+        translatedPoint = CGPointMake(firstX+translatedPoint.x, firstY+translatedPoint.y);
+    }
+
 	[view setCenter:translatedPoint];
     /*
 	if([(UIPanGestureRecognizer*)sender state] == UIGestureRecognizerStateEnded) {
@@ -523,8 +591,13 @@ float firstX = 0.0, firstY = 0.0;
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////
-// startup
+// events
 /////////////////////////////////////////////////////////////////////////////////////////////
+
+- (void) visible:(int) status {
+    if(moviePlayer && moviePlayer.view) moviePlayer.view.alpha = status ? 1 : 0;
+    if(localview) localview.alpha = status ? 1 : 0;
+}
 
 - (void) resetTo:(float)time {
     if(moviePlayer) {
@@ -605,6 +678,21 @@ float firstX = 0.0, firstY = 0.0;
     }
 }
 
+- (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
+    [self playmode:-1]; // toggle
+}
+
+- (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event {
+}
+
+- (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event {
+}
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// network
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 ServerBrowser* networkServerBrowser = 0;
 
 - (void)networkTrafficReceived:(id)notification {
@@ -637,6 +725,12 @@ ServerBrowser* networkServerBrowser = 0;
                     if(value) [self resetTo:val];
                     [self playmode:1];
                 }
+                else if([message isEqualToString:@"hide"]) {
+                    [self visible:0];
+                }
+                else if([message isEqualToString:@"show"]) {
+                    [self visible:1];
+                }
                 else if([message isEqualToString:@"reset"]) {
                     [self resetTo:val];
                 }
@@ -656,6 +750,10 @@ ServerBrowser* networkServerBrowser = 0;
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// init
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 - (id)initWithURL:(NSString *)url {
     self = [super init];
@@ -703,29 +801,13 @@ ServerBrowser* networkServerBrowser = 0;
         }
     }
 
-    // um? what? xxx
-    
-    [[NSNotificationCenter defaultCenter] removeObserver:self
-                                                    name:MPMoviePlayerPlaybackDidFinishNotification
-                                                  object:moviePlayer];
-    
-    // start a small bonjour listener to listen for local commands from a command and control system
+    // listen to network
 
     //[[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(networkServiceFound:) name:@"NetworkServiceFound" object:nil];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(networkTrafficReceived:) name:@"NetworkTrafficReceived" object:nil];
     networkServerBrowser = [[ServerBrowser alloc] init];
     [networkServerBrowser start];
 
-}
-
-- (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
-    [self playmode:-1]; // toggle
-}
-
-- (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event {
-}
-
-- (void)touchesEnded:(NSSet *)touches withEvent:(UIEvent *)event {
 }
 
 
