@@ -56,7 +56,7 @@ NSArray *filelist = 0;
 	NSString *title = [filelist objectAtIndex:indexPath.row];
     defaultFile = title;
     ViewController* control = [[ViewController alloc] initWithURL:0];
-    [self presentViewController:control animated:YES completion:NULL];
+    [self presentViewController:control animated:NO completion:NULL];
 }
 
 @end

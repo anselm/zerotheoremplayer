@@ -1,25 +1,46 @@
 
 #import "ServerBrowser.h"
 
+//extern "C" {
+//    char c_device_power[100] = { 0 };
+//    char c_device_state[100] = { 0 };
+//    char c_device_name[100] = { 0 };
+//}
+
 @implementation ServerBrowser
 
-@synthesize servers,server,connection;
+@synthesize servers,server,connection,device_name,device_power,device_state;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // heartbeat
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-float batteryLevel = 0;
-int batteryState = 0;
+static float batteryLevel = 0;
+static int batteryState = 0;
 
 - (void) heartbeat:(NSTimer*)timer {
+
+    // get some state
+    [device_power release];
+    [device_state release];
+    [device_name release];
+
+    device_power = [NSString stringWithFormat:@"%03.2f",batteryLevel];
+    [device_power retain];
+    //[device_power getCString:c_device_power maxLength:100 encoding:NSUTF8StringEncoding];
+    device_state = [NSString stringWithFormat:@"%02d",batteryState];
+    [device_state retain];
+    //[device_state getCString:c_device_state maxLength:100 encoding:NSUTF8StringEncoding];
+    device_name = [[UIDevice currentDevice] name];
+    [device_name retain];
+    //[device_name getCString:c_device_name maxLength:100 encoding:NSUTF8StringEncoding];
+    
     // send our battery status periodically
     if(connection) {
-        NSString* power = [NSString stringWithFormat:@"%f",batteryLevel];
         NSDictionary* dict = [NSDictionary dictionaryWithObjectsAndKeys:
-                              power, @"power",
-                              //[[UIDevice currentDevice] uniqueIdentifier],@"device",
-                              [[UIDevice currentDevice] name],@"name",
+                              device_power, @"power",
+                              device_state, @"state",
+                              device_name,@"name",
                               [[UIDevice currentDevice] systemName],@"sysname",
                               [[UIDevice currentDevice] systemVersion],@"version",
                               [[UIDevice currentDevice] model],@"model",
@@ -32,9 +53,9 @@ int batteryState = 0;
 
 - (void)batteryChanged:(NSNotification *)notification {
     UIDevice *device = [UIDevice currentDevice];
-    batteryLevel = device.batteryLevel;
+    batteryLevel = device.batteryLevel * 100.0f;
     batteryState = device.batteryState;
-    NSLog(@"State: %i Charge: %f", device.batteryState, device.batteryLevel);
+    NSLog(@"battery reported tate: %i Charge: %f", device.batteryState, device.batteryLevel);
 }
 
 - (void) heartbeatStart {
@@ -61,6 +82,11 @@ int batteryState = 0;
     servers = [[NSMutableArray alloc] init];
     server = nil;
     connection = nil;
+    device_name = @"name";
+    device_power = @"000.000";
+    device_state = @"00";
+    device_name = [[UIDevice currentDevice] name];
+    [device_name retain];
     return self;
 }
 

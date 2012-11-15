@@ -5,12 +5,6 @@
 #import "ListController.h"
 #import "FilePicker.h"
 
-bool useexternal = 0;
-bool useavplayer = 0;
-int fillmode = 2;
-int loopmode = 0;
-int rotated = 0;
-
 @implementation AppDelegate
 
 - (void)dealloc {
@@ -33,14 +27,14 @@ int rotated = 0;
     FilePicker* filepicker = [[FilePicker alloc] init];
     
 	// And a navigation bar
-	//UINavigationController* nav = [[UINavigationController alloc] initWithRootViewController:control];
+	UINavigationController* nav = [[UINavigationController alloc] initWithRootViewController:filepicker];
 
-    //self.viewController = (UIViewController*)nav;
     CGRect bounds = [[UIScreen mainScreen] bounds];
     NSLog(@"starting bounds are %f,%f",bounds.size.width,bounds.size.height); // not valid till after viewwillappear
     
     self.window = [[UIWindow alloc] initWithFrame:bounds];
-    self.window.rootViewController = filepicker;
+    self.window.rootViewController = nav;
+    //self.viewController = (UIViewController*)nav;
 //    [self.window addSubview:control.view];
     [self.window makeKeyAndVisible];
     
@@ -49,7 +43,7 @@ int rotated = 0;
 }
 
 - (void)applicationDidEnterBackground:(UIApplication *)application {
-    exit(0);
+   // exit(0);
 }
 
 

@@ -3,13 +3,6 @@
 #import "ViewController.h"
 #import "ListController.h"
 
-
-extern bool useexternal ;
-extern bool useavplayer ;
-extern int fillmode ;
-extern int loopmode ;
-extern int rotated;
-
 @implementation FilePicker
 
 NSString* text = @"http://hook.org/l/files.json";
@@ -51,7 +44,8 @@ NSString* text = @"http://hook.org/l/files.json";
     }
     
     ListController* control = [[ListController alloc] init];
-    [self presentViewController:control animated:YES completion:NULL];
+    //[self presentViewController:control animated:YES completion:NULL];
+    [[self navigationController] pushViewController:control animated:YES];
 }
 
 - (BOOL)textFieldShouldBeginEditing:(UITextField *)textField {
@@ -104,6 +98,11 @@ NSString* text = @"http://hook.org/l/files.json";
 		[activeTextField resignFirstResponder];
     
     rotated = [sender selectedSegmentIndex];
+    
+    
+    NSUserDefaults *c = [NSUserDefaults standardUserDefaults];
+    [c setFloat:rotated*M_PI forKey:@"rotation"]; // basically we blow away the rotated settings if you set it here xxx improve design here todo
+
 }
 
 
@@ -128,6 +127,7 @@ NSString* text = @"http://hook.org/l/files.json";
     CGRect bounds = [[UIScreen mainScreen] bounds];
     NSLog(@"runtime bounds are %f,%f",bounds.size.width,bounds.size.height); // not valid till after viewwillappear
 
+    
     ////////////////////////////////////////
     // movie mode; avplayer or not
     {
@@ -247,6 +247,9 @@ NSString* text = @"http://hook.org/l/files.json";
     [button addTarget:self action:@selector(buttonPicked:) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:button];
     
+    UILabel* l = [[UILabel alloc] initWithFrame: CGRectMake(60,40*8,100,30)];
+    [l setText:@"version 2.3"];
+    [self.view addSubview:l];    
 }
 
 @end

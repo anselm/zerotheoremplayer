@@ -32,7 +32,7 @@
 		4360251D1636909000B8D2F4 /* ViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = 4360251C1636909000B8D2F4 /* ViewController.m */; };
 		4396C1F6163E9F42008BA00D /* ListController.m in Sources */ = {isa = PBXBuildFile; fileRef = 4396C1F5163E9F42008BA00D /* ListController.m */; };
 		4396C243163F169E008BA00D /* Connection.m in Sources */ = {isa = PBXBuildFile; fileRef = 4396C235163F169E008BA00D /* Connection.m */; };
-		4396C248163F169E008BA00D /* ServerBrowser.m in Sources */ = {isa = PBXBuildFile; fileRef = 4396C23F163F169E008BA00D /* ServerBrowser.m */; };
+		4396C248163F169E008BA00D /* ServerBrowser.mm in Sources */ = {isa = PBXBuildFile; fileRef = 4396C23F163F169E008BA00D /* ServerBrowser.mm */; };
 		4396C250163FC77F008BA00D /* AppDelegate.mm in Sources */ = {isa = PBXBuildFile; fileRef = 4396C24F163FC77F008BA00D /* AppDelegate.mm */; };
 		43AD439A1642FEE700356C33 /* FilePicker.m in Sources */ = {isa = PBXBuildFile; fileRef = 43AD43991642FEE700356C33 /* FilePicker.m */; };
 		43BC81F016369500002C48E8 /* MediaPlayer.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 43BC81EF16369500002C48E8 /* MediaPlayer.framework */; };
@@ -72,7 +72,7 @@
 		4396C234163F169E008BA00D /* Connection.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Connection.h; sourceTree = "<group>"; };
 		4396C235163F169E008BA00D /* Connection.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = Connection.m; sourceTree = "<group>"; };
 		4396C23E163F169E008BA00D /* ServerBrowser.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ServerBrowser.h; sourceTree = "<group>"; };
-		4396C23F163F169E008BA00D /* ServerBrowser.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = ServerBrowser.m; sourceTree = "<group>"; };
+		4396C23F163F169E008BA00D /* ServerBrowser.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ServerBrowser.mm; sourceTree = "<group>"; };
 		4396C24F163FC77F008BA00D /* AppDelegate.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = AppDelegate.mm; sourceTree = "<group>"; };
 		43AD43981642FEE700356C33 /* FilePicker.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FilePicker.h; sourceTree = "<group>"; };
 		43AD43991642FEE700356C33 /* FilePicker.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = FilePicker.m; sourceTree = "<group>"; };
@@ -178,7 +178,7 @@
 				4396C234163F169E008BA00D /* Connection.h */,
 				4396C235163F169E008BA00D /* Connection.m */,
 				4396C23E163F169E008BA00D /* ServerBrowser.h */,
-				4396C23F163F169E008BA00D /* ServerBrowser.m */,
+				4396C23F163F169E008BA00D /* ServerBrowser.mm */,
 			);
 			name = network;
 			path = zerotheoremplayer/network;
@@ -263,7 +263,7 @@
 				4360251D1636909000B8D2F4 /* ViewController.m in Sources */,
 				4396C1F6163E9F42008BA00D /* ListController.m in Sources */,
 				4396C243163F169E008BA00D /* Connection.m in Sources */,
-				4396C248163F169E008BA00D /* ServerBrowser.m in Sources */,
+				4396C248163F169E008BA00D /* ServerBrowser.mm in Sources */,
 				4396C250163FC77F008BA00D /* AppDelegate.mm in Sources */,
 				43AD439A1642FEE700356C33 /* FilePicker.m in Sources */,
 			);
@@ -344,7 +344,7 @@
 				GCC_PREFIX_HEADER = "zerotheoremplayer/zerotheoremplayer-Prefix.pch";
 				INFOPLIST_FILE = "zerotheoremplayer/zerotheoremplayer-Info.plist";
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE = "342FA615-CB22-4571-9155-D7392DFCC34C";
+				PROVISIONING_PROFILE = "F7575848-B3F0-46F3-8767-3BBC756CD1FD";
 				SDKROOT = iphoneos;
 				WRAPPER_EXTENSION = app;
 			};
@@ -358,7 +358,7 @@
 				GCC_PREFIX_HEADER = "zerotheoremplayer/zerotheoremplayer-Prefix.pch";
 				INFOPLIST_FILE = "zerotheoremplayer/zerotheoremplayer-Info.plist";
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				PROVISIONING_PROFILE = "342FA615-CB22-4571-9155-D7392DFCC34C";
+				PROVISIONING_PROFILE = "F7575848-B3F0-46F3-8767-3BBC756CD1FD";
 				SDKROOT = iphoneos;
 				WRAPPER_EXTENSION = app;
 			};
