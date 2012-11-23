@@ -37,4 +37,5 @@ extern bool useexternal;
 extern bool useavplayer;
 extern int fillmode;
 extern int loopmode;
-extern int rotated;
+extern float rotated;
+extern bool interactive;

@@ -107,7 +107,7 @@ static int batteryState = 0;
 		return NO;
 	}
     [netServiceBrowser setDelegate:self];
-	[netServiceBrowser searchForServicesOfType:@"_zerotheorem._tcp." inDomain:@""];
+	[netServiceBrowser searchForServicesOfType:MYNETWORKNAME inDomain:@""];
     return YES;
 }
 

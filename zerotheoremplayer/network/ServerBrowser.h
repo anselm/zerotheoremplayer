@@ -23,3 +23,5 @@
 - (BOOL)start;
 - (void)stop;
 @end
+
+#define MYNETWORKNAME @"_myzerotheorem._tcp."

@@ -11,7 +11,7 @@ bool useexternal = 1;
 bool useavplayer = 1;
 int fillmode = 2;
 int loopmode = 1;
-int rotated = 0;
+float rotated = 0;
 NSString* defaultFile = 0;
 int nloops = 0;
 int skipBlack = 1;
@@ -19,7 +19,7 @@ float worldx = 0;
 float worldy = 0;
 float stretchx = 1.0;
 float stretchy = 1.0;
-float rotation = 0.0f;
+bool interactive = 1;
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 // av player util
@@ -363,7 +363,7 @@ static int poll_count = 0;
         nloops++;
         if(skipBlack || loopmode) {
             // this disables not-looping - a way to re-loop because the end of some movies is not black
-            Float64 seconds = 0;
+            Float64 seconds = skipBlack ? 2 : 0;
             int32_t preferredTimeScale = 25;
             CMTime inTime = CMTimeMakeWithSeconds(seconds, preferredTimeScale);
             [player seekToTime:inTime];
@@ -459,6 +459,7 @@ static int poll_count = 0;
     }
 
     // re attach gesture recognizers
+    if(!interactive)return;
     
     if(!pinchRecognizer) {
         pinchRecognizer = [[UIPinchGestureRecognizer alloc] initWithTarget:self action:@selector(onscale:)];
@@ -591,11 +592,11 @@ static CGAffineTransform transform;
 -(void)configSave {
     NSUserDefaults *c = [NSUserDefaults standardUserDefaults];
     [c setObject:@"v11" forKey:@"v"];
-    [c setFloat:lastScaleX forKey:@"lastScaleX"];
-    [c setFloat:lastScaleY forKey:@"lastScaleY"];
+    [c setFloat:stretchx forKey:@"lastScaleX"];
+    [c setFloat:stretchy forKey:@"lastScaleY"];
     [c setFloat:worldx forKey:@"worldx"];
     [c setFloat:worldy forKey:@"worldy"];
-    [c setFloat:rotation forKey:@"rotation"];
+    [c setFloat:rotated forKey:@"rotation"];
     [c synchronize];
 }
 
@@ -603,23 +604,23 @@ static CGAffineTransform transform;
     NSUserDefaults *c = [NSUserDefaults standardUserDefaults];
     [c synchronize];
     if([[c stringForKey:@"v"] isEqualToString:@"v11"]) {
-        lastScaleX = [c floatForKey:@"lastScaleX"];
-        lastScaleY = [c floatForKey:@"lastScaleX"];
+        stretchx = [c floatForKey:@"lastScaleX"];
+        stretchy = [c floatForKey:@"lastScaleX"];
         worldx = [c floatForKey:@"worldx"];
         worldy = [c floatForKey:@"worldy"];
-        rotation = [c floatForKey:@"rotation"];
+        rotated = [c floatForKey:@"rotation"];
         [self scale:0 y:0];
         [self move:0 y:0];
     }
 }
 
 -(void)configApply {
-    NSLog(@"view stretch %f %f move %f %f rotation %f",stretchx,stretchy,worldx,worldy,rotation);
+    NSLog(@"view stretch %f %f move %f %f rotation %f",stretchx,stretchy,worldx,worldy,rotated);
     UIView* view = externalview ? externalview : localview;
     if(!view)return;
     transform = CGAffineTransformTranslate(CGAffineTransformIdentity,worldx,worldy);
     transform = CGAffineTransformScale(transform,stretchx,stretchy);
-    transform = CGAffineTransformRotate(transform,rotation* M_PI/2.0);
+    transform = CGAffineTransformRotate(transform,rotated* M_PI/2.0);
     [view setTransform:transform];
     [self configSave];
 }
@@ -627,12 +628,12 @@ static CGAffineTransform transform;
 -(void)configReset {
     lastScaleX = lastScaleY = 1.0;
     worldx = worldy = 0;
-    rotation = 0;
+    rotated = 0;
     [self configApply];
 }
 
 -(void)rotate:(float)r {
-    rotation += r;
+    rotated += r;
     [self configApply];
 }
 
@@ -709,8 +710,8 @@ static CGAffineTransform transform;
      //	[view setCenter:translatedPoint];
      */
 
-    worldx = translatedPoint.x+firstX;
-    worldy = translatedPoint.y+firstY;
+    worldx = translatedPoint.y+firstX;
+    worldy = firstY-translatedPoint.x;
 
     [self configApply];
 
@@ -739,7 +740,9 @@ static CGAffineTransform transform;
 }
 
 - (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
-    [self playmode:-1]; // toggle
+    if(interactive) {
+        [self playmode:-1]; // toggle
+    }
 }
 
 - (void)touchesMoved:(NSSet *)touches withEvent:(UIEvent *)event {

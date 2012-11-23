@@ -98,11 +98,21 @@ NSString* text = @"http://hook.org/l/files.json";
 		[activeTextField resignFirstResponder];
     
     rotated = [sender selectedSegmentIndex];
-    
+    NSLog(@"set rotation %f",rotated);
     
     NSUserDefaults *c = [NSUserDefaults standardUserDefaults];
-    [c setFloat:rotated*M_PI forKey:@"rotation"]; // basically we blow away the rotated settings if you set it here xxx improve design here todo
+    [c setFloat:rotated forKey:@"rotation"]; // basically we blow away the rotated settings if you set it here xxx improve design here todo
+    [c synchronize];
 
+}
+
+- (void)segmentInteractive:(UISegmentedControl*)sender {
+    if ([activeTextField canResignFirstResponder])
+		[activeTextField resignFirstResponder];
+
+    interactive = [sender selectedSegmentIndex] ? 0 : 1;
+    
+    
 }
 
 
@@ -199,7 +209,7 @@ NSString* text = @"http://hook.org/l/files.json";
     
     /////////////////////////////////////////
     // network input
-    
+/*
     UITextField *playerTextField = [ [ UITextField alloc ] initWithFrame: CGRectMake(60, 40*5, 400, 40) ];
     playerTextField.adjustsFontSizeToFitWidth = YES;
     playerTextField.textColor = [UIColor blackColor];
@@ -222,7 +232,7 @@ NSString* text = @"http://hook.org/l/files.json";
     
     //playerTextField.frame = CGRectMake(80.0, 210.0, 160.0, 40.0);
     [self.view addSubview:playerTextField];
-
+*/
     
     ////////////////////////////////////////
     // rotate
@@ -238,17 +248,29 @@ NSString* text = @"http://hook.org/l/files.json";
         [self.view addSubview: e ];
     }
 
+    ////////////////////////////////////////
+    // interactive
+    {
+        UISegmentedControl *e = [ [ UISegmentedControl alloc ] initWithFrame:CGRectMake(60, 40*7,400, 30)  ];
+        [ e insertSegmentWithTitle: @"touch" atIndex: 0 animated: NO ];
+        [ e insertSegmentWithTitle: @"notouch" atIndex: 1 animated: NO ];
+        e.selectedSegmentIndex = interactive ? 0 : 1;
+        e.tag = 10;
+        [e addTarget:self action:@selector(segmentInteractive:) forControlEvents:UIControlEventValueChanged];
+        [self.view addSubview: e ];
+    }
+
     ////////////////////////////////////////////
     // button
-    
+/*
     UIButton *button = [[UIButton buttonWithType:UIButtonTypeRoundedRect] retain];
-    button.frame = CGRectMake(60, 40*7, 400, 30);
+    button.frame = CGRectMake(60, 40*8, 400, 30);
     [button setTitle:@"Connect" forState:UIControlStateNormal];
     [button addTarget:self action:@selector(buttonPicked:) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:button];
-    
-    UILabel* l = [[UILabel alloc] initWithFrame: CGRectMake(60,40*8,100,30)];
-    [l setText:@"version 2.3"];
+  */  
+    UILabel* l = [[UILabel alloc] initWithFrame: CGRectMake(60,40*9,100,30)];
+    [l setText:@"v 2.6 norot"];
     [self.view addSubview:l];    
 }
 
