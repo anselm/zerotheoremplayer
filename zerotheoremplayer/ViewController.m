@@ -10,16 +10,16 @@
 bool useexternal = 1;
 bool useavplayer = 1;
 int fillmode = 2;
-int loopmode = 1;
+int loopmode = 0;
 float rotated = 0;
 NSString* defaultFile = 0;
 int nloops = 0;
-int skipBlack = 1;
+int skipBlack = 0;
 float worldx = 0;
 float worldy = 0;
 float stretchx = 1.0;
 float stretchy = 1.0;
-bool interactive = 1;
+bool interactive = 0;
 
 /////////////////////////////////////////////////////////////////////////////////////////////
 // av player util
@@ -185,8 +185,10 @@ static int poll_count = 0;
         [old stop];
         [old release];
     }
-    
+
     moviePlayer = [[MPMoviePlayerController alloc] initWithContentURL:filepathurl];
+
+    [[MPMusicPlayerController applicationMusicPlayer] setVolume:1.0f];
 
     // attach to appropriate window
     
